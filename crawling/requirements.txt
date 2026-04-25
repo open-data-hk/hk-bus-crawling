@@ -2,7 +2,7 @@ brotlipy==0.7.0
 certifi==2020.12.5
 cffi==1.15.0
 chardet==4.0.0
-cryptography==3.4.7
+cryptography==47.0.0
 haversine>=2.3.0
 idna==2.10
 pycparser==2.20
