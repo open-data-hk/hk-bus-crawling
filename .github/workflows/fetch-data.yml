@@ -45,44 +45,44 @@ jobs:
             echo "target-path=/" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Install poetry
+        run: pipx install poetry
+
       - name: Setup Python environment
         uses: actions/setup-python@v6
         with:
             python-version: '3.14'
             architecture: 'x64'
-            cache: 'pip'
-            cache-dependency-path: crawling/requirements.txt
+            cache: 'poetry'
+
       - name: Install dependencies
-        shell: bash
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r ./crawling/requirements.txt
+        run: poetry install
       - name: Crawling resources
         shell: bash
         env:
           REQUEST_LIMIT: "6"
         run: |
           set -o xtrace
-          python ./crawling/parseHoliday.py
-          python ./crawling/ctb.py
-          python ./crawling/kmb.py
-          python ./crawling/nlb.py
-          python ./crawling/lrtfeeder.py
-          python ./crawling/lightRail.py
-          python ./crawling/mtr.py
-          python ./crawling/parseJourneyTime.py
-          python ./crawling/parseGtfs.py
-          python ./crawling/parseGtfsEn.py
-          python ./crawling/gmb.py
-          python ./crawling/sunferry.py
-          python ./crawling/fortuneferry.py
-          python ./crawling/hkkf.py
-          python ./crawling/matchGtfs.py
-          python ./crawling/cleansing.py
-          python ./crawling/mergeRoutes.py
-          python ./crawling/mergeStopList.py
-          python ./crawling/routeCompare.py
-          python ./crawling/mtrExits.py
+          poetry run python ./crawling/parseHoliday.py
+          poetry run python ./crawling/ctb.py
+          poetry run python ./crawling/kmb.py
+          poetry run python ./crawling/nlb.py
+          poetry run python ./crawling/lrtfeeder.py
+          poetry run python ./crawling/lightRail.py
+          poetry run python ./crawling/mtr.py
+          poetry run python ./crawling/parseJourneyTime.py
+          poetry run python ./crawling/parseGtfs.py
+          poetry run python ./crawling/parseGtfsEn.py
+          poetry run python ./crawling/gmb.py
+          poetry run python ./crawling/sunferry.py
+          poetry run python ./crawling/fortuneferry.py
+          poetry run python ./crawling/hkkf.py
+          poetry run python ./crawling/matchGtfs.py
+          poetry run python ./crawling/cleansing.py
+          poetry run python ./crawling/mergeRoutes.py
+          poetry run python ./crawling/mergeStopList.py
+          poetry run python ./crawling/routeCompare.py
+          poetry run python ./crawling/mtrExits.py
 
       - name: Update MD5
         shell: bash
