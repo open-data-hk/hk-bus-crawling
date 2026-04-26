@@ -1,92 +1,164 @@
 import asyncio
 import json
 import logging
-from os import path
+from pathlib import Path
+from typing import Literal
 
 import httpx
-from crawl_utils import emitRequest, get_request_limit
-from utils import DATA_DIR
+
+from .crawl_utils import emitRequest, get_request_limit
+from .utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
+# Raw list files
+RAW_ROUTE_LIST = DATA_DIR / ("ctb.raw.routeList.json")
+RAW_ROUTE_STOP_LIST = DATA_DIR / ("ctb.raw.routeStopList.json")
+RAW_STOP_LIST = DATA_DIR / ("ctb.raw.stopList.json")
 
-async def getRouteStop(co):
+# define output name
+ROUTE_LIST = DATA_DIR / "routeList.ctb.json"
+STOP_LIST = DATA_DIR / "stopList.ctb.json"
+
+BASE_URL = "https://rt.data.gov.hk/v2/transport/citybus"
+
+
+def routes_url():
+    return BASE_URL + "/route/ctb"
+
+
+def stop_url(stopId: str):
+    return BASE_URL + "/stop/" + stopId
+
+
+def route_stop_url(route: str, direction: Literal["inbound", "outbound"]):
+    return BASE_URL + "/route-stop/ctb/" + route + "/" + direction
+
+
+req_route_stop_limit = asyncio.Semaphore(get_request_limit())
+req_stop_list_limit = asyncio.Semaphore(get_request_limit())
+
+# methods of single API request
+
+
+async def get_route_list(a_client) -> list[dict]:
+    logger.info("Fetching route list of ctb")
+    r = await emitRequest(routes_url(), a_client)
+    return r.json()["data"]
+
+
+async def get_stop(stopId, a_client) -> dict:
+    async with req_stop_list_limit:
+        r = await emitRequest(stop_url(stopId), a_client)
+    return r.json()["data"]
+
+
+async def get_route_stop(route: str, a_client) -> dict[str, list[dict]]:
+    # TODO: remove this commented code if found useless
+    # if route.get("bound", 0) != 0 or route.get("stops", {}):
+    #     return route
+
+    route_stops = {}
+    for direction in ["inbound", "outbound"]:
+        r = await emitRequest(
+            route_stop_url(route, direction),
+            a_client,
+        )
+        result = r.json()["data"]
+        route_key = f"{route}-{direction}"
+
+        route_stops[route_key] = result
+    return route_stops
+
+
+# methods of multiple API requests
+
+
+async def get_stop_list(stops, a_client) -> list[dict]:
+    logger.info("Fetching stop list of ctb")
+    ret = await asyncio.gather(*[get_stop(stop, a_client) for stop in stops])
+    return ret
+
+
+async def get_route_stop_list(route_list: list[dict], a_client) -> dict[str, list]:
+    logger.info("Fetching route stop list of ctb")
+    route_stop_list = await asyncio.gather(
+        *[get_route_stop(route["route"], a_client) for route in route_list]
+    )
+
+    route_stops = {}
+    for single_route_stops in route_stop_list:
+        for route_key, route_stop in single_route_stops.items():
+            route_stops[route_key] = route_stop
+
+    return route_stops
+
+
+async def prepare_data():
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
-    # define output name
-    ROUTE_LIST = DATA_DIR / ("routeList." + co + ".json")
-    STOP_LIST = DATA_DIR / ("stopList." + co + ".json")
 
     # load route list and stop list if exist
-    routeList = {}
-    if path.isfile(ROUTE_LIST):
+    route_list: list[dict] = []
+    # TODO: check why return if route_list exists
+    if ROUTE_LIST.exists():
+        logger.info(f"{ROUTE_LIST} already exist, skipping...")
         return
     else:
         # load routes
-        r = await emitRequest(
-            "https://rt.data.gov.hk/v2/transport/citybus/route/" + co, a_client
-        )
-        routeList = r.json()["data"]
-
-    _stops = []
-    stopList = {}
-    if path.isfile(STOP_LIST):
-        with open(STOP_LIST, "r", encoding="UTF-8") as f:
-            stopList = json.load(f)
-
-    # function to load single stop info
-    req_stop_list_limit = asyncio.Semaphore(get_request_limit())
-
-    async def getStop(stopId):
-        async with req_stop_list_limit:
-            r = await emitRequest(
-                "https://rt.data.gov.hk/v2/transport/citybus/stop/" + stopId, a_client
+        raw_route_list_path = Path(RAW_ROUTE_LIST)
+        if raw_route_list_path.exists():
+            route_list = json.loads(raw_route_list_path.read_text("utf-8"))
+        else:
+            route_list = await get_route_list(a_client)
+            raw_route_list_path.write_text(
+                json.dumps(route_list, ensure_ascii=False), encoding="UTF-8"
             )
-        return r.json()["data"]
 
-    # function to async load multiple stops info
-    async def getStopList(stops):
-        ret = await asyncio.gather(*[getStop(stop) for stop in stops])
-        return ret
+    _stop_ids = []
+    stop_list = {}
+    if STOP_LIST.exists():
+        with open(STOP_LIST, "r", encoding="UTF-8") as f:
+            stop_list = json.load(f)
 
-    req_route_stop_limit = asyncio.Semaphore(get_request_limit())
+    raw_route_stop_list_path = Path(RAW_ROUTE_STOP_LIST)
+    if raw_route_stop_list_path.exists():
+        route_stop_list = json.loads(raw_route_stop_list_path.read_text("utf-8"))
+    else:
+        route_stop_list = await get_route_stop_list(route_list, a_client)
+        raw_route_stop_list_path.write_text(
+            json.dumps(route_stop_list, ensure_ascii=False), encoding="UTF-8"
+        )
 
-    async def getRouteStop(param):
-        co, route = param
-        if route.get("bound", 0) != 0 or route.get("stops", {}):
-            return route
+    logger.info("Preparing data of ctb")
+
+    for route in route_list:
+
         route["stops"] = {}
         for direction in ["inbound", "outbound"]:
-            r = await emitRequest(
-                "https://rt.data.gov.hk/v2/transport/citybus/route-stop/"
-                + co.upper()
-                + "/"
-                + route["route"]
-                + "/"
-                + direction,
-                a_client,
-            )
-            route["stops"][direction] = [stop["stop"] for stop in r.json()["data"]]
-        return route
+            route_code = f"{route['route']}-{direction}"
+            route_stop = route_stop_list[route_code]
+            route["stops"][direction] = [stop["stop"] for stop in route_stop]
 
-    async def getRouteStopList():
-        ret = await asyncio.gather(*[getRouteStop((co, route)) for route in routeList])
-        return ret
-
-    routeList = await getRouteStopList()
-    for route in routeList:
-        for direction, stops in route["stops"].items():
-            for stopId in stops:
-                _stops.append(stopId)
+            _stop_ids.extend(route["stops"][direction])
 
     # load stops for this route aync
-    _stops = sorted(set(_stops))
+    _stop_ids = sorted(set(_stop_ids))
 
-    stopInfos = list(zip(_stops, await getStopList(_stops)))
+    raw_stop_list_path = Path(RAW_STOP_LIST)
+    if raw_stop_list_path.exists():
+        stop_list_raw = json.loads(raw_stop_list_path.read_text("utf-8"))
+    else:
+        stop_list_raw = await get_stop_list(_stop_ids, a_client)
+        raw_stop_list_path.write_text(
+            json.dumps(stop_list_raw, ensure_ascii=False), encoding="UTF-8"
+        )
+
+    stopInfos = list(zip(_stop_ids, stop_list_raw))
     for stopId, stopInfo in stopInfos:
-        stopList[stopId] = stopInfo
+        stop_list[stopId] = stopInfo
 
     _routeList = []
-    for route in routeList:
+    for route in route_list:
         if route.get("bound", 0) != 0:
             _routeList.append(route)
             continue
@@ -94,7 +166,7 @@ async def getRouteStop(co):
             if len(route["stops"][bound]) > 0:
                 _routeList.append(
                     {
-                        "co": co,
+                        "co": "ctb",
                         "route": route["route"],
                         "bound": "O" if bound == "outbound" else "I",
                         "orig_en": (
@@ -119,7 +191,7 @@ async def getRouteStop(co):
                         ),
                         "stops": list(
                             filter(
-                                lambda stopId: bool(stopList[stopId]),
+                                lambda stopId: bool(stop_list[stopId]),
                                 route["stops"][bound],
                             )
                         ),
@@ -130,10 +202,10 @@ async def getRouteStop(co):
     with open(ROUTE_LIST, "w", encoding="UTF-8") as f:
         f.write(json.dumps(_routeList, ensure_ascii=False))
     with open(STOP_LIST, "w", encoding="UTF-8") as f:
-        f.write(json.dumps(stopList, ensure_ascii=False))
+        f.write(json.dumps(stop_list, ensure_ascii=False))
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    asyncio.run(getRouteStop("ctb"))
+    asyncio.run(prepare_data())
