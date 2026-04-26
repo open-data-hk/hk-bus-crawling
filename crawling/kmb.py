@@ -9,6 +9,20 @@ import httpx
 from crawl_utils import emitRequest
 from utils import DATA_DIR
 
+BASE_URL = "https://data.etabus.gov.hk/v1/transport/kmb"
+
+
+def stops_url():
+    return BASE_URL + "/stop"
+
+
+def routes_url():
+    return BASE_URL + "/route/"
+
+
+def route_stops_url():
+    return BASE_URL + "/route-stop/"
+
 
 async def getRouteStop():
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
@@ -16,15 +30,16 @@ async def getRouteStop():
     ROUTE_LIST = DATA_DIR / "routeList.kmb.json"
     STOP_LIST = DATA_DIR / "stopList.kmb.json"
 
+    if path.isfile(ROUTE_LIST):
+        return
+
     stopList = {}
     if path.isfile(STOP_LIST):
         with open(STOP_LIST, "r", encoding="UTF-8") as f:
             stopList = json.load(f)
     else:
         # load stops
-        r = await emitRequest(
-            "https://data.etabus.gov.hk/v1/transport/kmb/stop", a_client
-        )
+        r = await emitRequest(stops_url(), a_client)
         _stopList = r.json()["data"]
         for stop in _stopList:
             stopList[stop["stop"]] = stop
@@ -34,53 +49,46 @@ async def getRouteStop():
             print("Not exist stop: ", stopId, file=sys.stderr)
         return stopId in stopList
 
-    # load route list and stop list if exist
+    # load route list
     routeList = {}
-    if path.isfile(ROUTE_LIST):
-        return
-    else:
-        # load routes
-        r = await emitRequest(
-            "https://data.etabus.gov.hk/v1/transport/kmb/route/", a_client
+    # load routes
+    r = await emitRequest(routes_url(), a_client)
+    for route in r.json()["data"]:
+        route["stops"] = {}
+        route["co"] = "kmb"
+        routeList["+".join([route["route"], route["service_type"], route["bound"]])] = (
+            route
         )
-        for route in r.json()["data"]:
-            route["stops"] = {}
-            route["co"] = "kmb"
-            routeList[
-                "+".join([route["route"], route["service_type"], route["bound"]])
-            ] = route
 
-        # load route stops
-        r = await emitRequest(
-            "https://data.etabus.gov.hk/v1/transport/kmb/route-stop/", a_client
-        )
-        for stop in r.json()["data"]:
-            routeKey = "+".join([stop["route"], stop["service_type"], stop["bound"]])
-            if routeKey in routeList:
-                routeList[routeKey]["stops"][int(stop["seq"])] = stop["stop"]
-            else:
-                # if route not found, clone it from service type = 1
-                _routeKey = "+".join([stop["route"], str("1"), stop["bound"]])
-                routeList[routeKey] = copy.deepcopy(routeList[_routeKey])
-                routeList[routeKey]["stops"] = {}
-                routeList[routeKey]["stops"][int(stop["seq"])] = stop["stop"]
+    # load route stops
+    r = await emitRequest(route_stops_url(), a_client)
+    for stop in r.json()["data"]:
+        routeKey = "+".join([stop["route"], stop["service_type"], stop["bound"]])
+        if routeKey in routeList:
+            routeList[routeKey]["stops"][int(stop["seq"])] = stop["stop"]
+        else:
+            # if route not found, clone it from service type = 1
+            _routeKey = "+".join([stop["route"], str("1"), stop["bound"]])
+            routeList[routeKey] = copy.deepcopy(routeList[_routeKey])
+            routeList[routeKey]["stops"] = {}
+            routeList[routeKey]["stops"][int(stop["seq"])] = stop["stop"]
 
-        # flatten the route stops back to array
-        for routeKey in routeList.keys():
-            stops = [
-                routeList[routeKey]["stops"][seq]
-                for seq in sorted(routeList[routeKey]["stops"].keys())
-            ]
-            # filter non-exist stops
-            stops = list(filter(isStopExist, stops))
-            routeList[routeKey]["stops"] = stops
-
-        # flatten the routeList back to array
-        routeList = [
-            routeList[routeKey]
-            for routeKey in routeList.keys()
-            if not routeKey.startswith("K")
+    # flatten the route stops back to array
+    for routeKey in routeList.keys():
+        stops = [
+            routeList[routeKey]["stops"][seq]
+            for seq in sorted(routeList[routeKey]["stops"].keys())
         ]
+        # filter non-exist stops
+        stops = list(filter(isStopExist, stops))
+        routeList[routeKey]["stops"] = stops
+
+    # flatten the routeList back to array
+    routeList = [
+        routeList[routeKey]
+        for routeKey in routeList.keys()
+        if not routeKey.startswith("K")
+    ]
 
     with open(ROUTE_LIST, "w", encoding="UTF-8") as f:
         f.write(json.dumps(routeList, ensure_ascii=False))

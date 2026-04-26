@@ -10,15 +10,27 @@ import httpx
 from crawl_utils import emitRequest
 from utils import DATA_DIR
 
+BASE_URL = "https://opendata.mtr.com.hk/data"
+
+
+def routes_url():
+    return BASE_URL + "/mtr_bus_routes.csv"
+
+
+def stops_url():
+    return BASE_URL + "/mtr_bus_stops.csv"
+
 
 async def getRouteStop(co="lrtfeeder"):
+    if (DATA_DIR / f"routeList.{co}.json").exists() and (
+        DATA_DIR / f"stopList.{co}.json"
+    ).exists():
+        return
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
     routeList = {}
     stopList = {}
 
-    r = await emitRequest(
-        "https://opendata.mtr.com.hk/data/mtr_bus_routes.csv", a_client
-    )
+    r = await emitRequest(routes_url(), a_client)
     r.encoding = "utf-8"
     reader = csv.reader(r.text.split("\n"))
     headers = next(reader, None)
@@ -47,9 +59,7 @@ async def getRouteStop(co="lrtfeeder"):
             }
 
     # Parse stops
-    r = await emitRequest(
-        "https://opendata.mtr.com.hk/data/mtr_bus_stops.csv", a_client
-    )
+    r = await emitRequest(stops_url(), a_client)
     r.encoding = "utf-8"
     reader = csv.reader(r.text.split("\n"))
     headers = next(reader, None)

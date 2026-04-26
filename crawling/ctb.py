@@ -5,9 +5,8 @@ from pathlib import Path
 from typing import Literal
 
 import httpx
-
-from .crawl_utils import emitRequest, get_request_limit
-from .utils import DATA_DIR
+from crawl_utils import emitRequest, get_request_limit
+from utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
 

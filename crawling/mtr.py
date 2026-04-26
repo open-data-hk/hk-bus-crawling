@@ -11,6 +11,17 @@ from crawl_utils import emitRequest
 from pyproj import Transformer
 from utils import DATA_DIR
 
+BASE_URL = "https://opendata.mtr.com.hk/data"
+GEODATA_URL = "https://geodata.gov.hk/gs/api/v1.0.0"
+
+
+def lines_stations_url():
+    return BASE_URL + "/mtr_lines_and_stations.csv"
+
+
+def location_search_url(query: str):
+    return GEODATA_URL + "/locationSearch?q=" + query
+
 
 def filterStops(route):
     route["stops"] = [stop for stop in route["stops"] if stop is not None]
@@ -18,15 +29,17 @@ def filterStops(route):
 
 
 async def getRouteStop(co="mtr"):
+    if (DATA_DIR / f"routeList.{co}.json").exists() and (
+        DATA_DIR / f"stopList.{co}.json"
+    ).exists():
+        return
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
     epsgTransformer = Transformer.from_crs("epsg:2326", "epsg:4326")
 
     routeList = {}
     stopList = {}
 
-    r = await emitRequest(
-        "https://opendata.mtr.com.hk/data/mtr_lines_and_stations.csv", a_client
-    )
+    r = await emitRequest(lines_stations_url(), a_client)
     r.encoding = "utf-8"
     reader = csv.reader(r.text.split("\n"))
     headers = next(reader, None)
@@ -55,9 +68,7 @@ async def getRouteStop(co="mtr"):
         routeList[route + "_" + bound]["stops"][int(float(seq))] = stopCode
         if stopCode not in stopList:
             r = await emitRequest(
-                "https://geodata.gov.hk/gs/api/v1.0.0/locationSearch?q=港鐵"
-                + chn
-                + "站",
+                location_search_url("港鐵" + chn + "站"),
                 a_client,
                 headers={"Accept": "application/json"},
             )

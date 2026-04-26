@@ -11,6 +11,18 @@ from crawl_utils import emitRequest
 from pyproj import Transformer
 from utils import DATA_DIR
 
+BASE_URL = "https://opendata.mtr.com.hk/data"
+GEODATA_URL = "https://geodata.gov.hk/gs/api/v1.0.0"
+
+
+def routes_stops_url():
+    return BASE_URL + "/light_rail_routes_and_stops.csv"
+
+
+def location_search_url(query: str):
+    return GEODATA_URL + "/locationSearch?q=" + query
+
+
 # List of Circular Routes
 circularRoutes = ("705", "706")
 
@@ -29,6 +41,10 @@ def routeKey(route, bound):
 
 
 async def getRouteStop(co="lightRail"):
+    if (DATA_DIR / f"routeList.{co}.json").exists() and (
+        DATA_DIR / f"stopList.{co}.json"
+    ).exists():
+        return
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
 
     epsgTransformer = Transformer.from_crs("epsg:2326", "epsg:4326")
@@ -37,9 +53,7 @@ async def getRouteStop(co="lightRail"):
     stopList = {}
     routeCollection = set()
 
-    r = await emitRequest(
-        "https://opendata.mtr.com.hk/data/light_rail_routes_and_stops.csv", a_client
-    )
+    r = await emitRequest(routes_stops_url(), a_client)
     reader = csv.reader(r.text.split("\n"))
     headers = next(reader, None)
     routes = [route for route in reader if len(route) >= 7]
@@ -80,7 +94,7 @@ async def getRouteStop(co="lightRail"):
             lightRailObject["stops"].append(lightRailId)
 
         if lightRailId not in stopList:
-            url = f"https://geodata.gov.hk/gs/api/v1.0.0/locationSearch?q={chn}輕鐵站"
+            url = location_search_url(chn + "輕鐵站")
             r = await emitRequest(url, a_client, headers={"Accept": "application/json"})
             try:
                 lat, lng = epsgTransformer.transform(r.json()[0]["y"], r.json()[0]["x"])

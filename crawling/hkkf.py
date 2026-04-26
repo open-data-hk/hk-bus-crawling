@@ -8,6 +8,17 @@ import httpx
 from crawl_utils import emitRequest
 from utils import DATA_DIR
 
+BASE_URL = "https://www.hkkfeta.com/opendata"
+
+
+def routes_url():
+    return BASE_URL + "/route/"
+
+
+def pier_url(stopId):
+    return BASE_URL + "/pier/" + str(stopId)
+
+
 routes = {
     "1": ["Central Pier 4", "Sok Kwu Wan"],
     "2": ["Central Pier 4", "Yung Shue Wan"],
@@ -24,19 +35,19 @@ def parseStop(name_en, apiStops):
 
 
 async def getRouteStop(co):
+    if (DATA_DIR / f"routeList.{co}.json").exists() and (
+        DATA_DIR / f"stopList.{co}.json"
+    ).exists():
+        return
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
     routeList = []
     stopList = {}
 
-    r = await emitRequest("https://www.hkkfeta.com/opendata/route/", a_client)
+    r = await emitRequest(routes_url(), a_client)
     apiRoutes = r.json()["data"]
     apiStops = []
     for stopId in [1, 2, 3, 4, 5, 6]:
-        stop = (
-            await emitRequest(
-                "https://www.hkkfeta.com/opendata/pier/" + str(stopId), a_client
-            )
-        ).json()["data"]
+        stop = (await emitRequest(pier_url(stopId), a_client)).json()["data"]
         apiStops.append(stop)
 
     with open(DATA_DIR / "gtfs.json", "r", encoding="utf-8") as f:
