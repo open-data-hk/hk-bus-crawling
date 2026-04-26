@@ -50,6 +50,23 @@ async def get_route(region: str, route_no: str, a_client):
         return r.json()["data"]
 
 
+async def get_route_stops(
+    route_id: int, route_seq: int, all_route_stops: dict, a_client
+) -> None:
+    """
+    Provided route's `route_id` and `route_seq`, request route_stop
+    and store result in `all_route_stops`
+    """
+
+    r = await emitRequest(
+        route_stop_url(route_id, route_seq),
+        a_client,
+    )
+    result = r.json()["data"]
+    key = f"{route_id}-{route_seq}"
+    all_route_stops[key] = result
+
+
 async def getRouteStop(co):
     if (DATA_DIR / f"routeList.{co}.json").exists() and (
         DATA_DIR / f"stopList.{co}.json"
@@ -101,14 +118,12 @@ async def getRouteStop(co):
 
     stopCandidates = {}
 
-    async def get_route_directions(route, route_no):
+    def process_route_directions(route, route_no, all_route_stops):
         service_type = 2
         for direction in route["directions"]:
-            rs = await emitRequest(
-                route_stop_url(route["route_id"], direction["route_seq"]),
-                a_client,
-            )
-            for stop in rs.json()["data"]["route_stops"]:
+            key = f'{route["route_id"]}-{direction["route_seq"]}'
+            route_stops = all_route_stops[key]
+            for stop in route_stops:
                 stop_id = stop["stop_id"]
 
                 # GMB ETA API Spec: "A stop may have different names under different routes"
@@ -197,10 +212,7 @@ async def getRouteStop(co):
                         if route["description_tc"].strip() == "正常班次"
                         else service_type
                     ),
-                    "stops": [
-                        str(stop["stop_id"])
-                        for stop in rs.json()["data"]["route_stops"]
-                    ],
+                    "stops": [str(stop["stop_id"]) for stop in route_stops],
                     "freq": getFreq(direction["headways"], serviceIdMap),
                 }
             )
@@ -230,12 +242,28 @@ async def getRouteStop(co):
 
     # TODO: save routes as raw files
 
+    # key: {route_id}-{route_seq}, e.g. 2006408-1
+    all_route_stops = {}
+
+    all_route_directions = [
+        (route["route_id"], direction["route_seq"])
+        for single_route_code_routes in all_routes
+        for route in single_route_code_routes
+        for direction in route["directions"]
+    ]
+
     await asyncio.gather(
         *[
-            get_route_directions(route, route_no)
-            for route, route_no in zip(all_routes, all_route_no)
+            get_route_stops(route_id, route_seq, all_route_stops, a_client)
+            for route_id, route_seq in all_route_directions
         ]
     )
+
+    # TODO: save all_route_stops as raw files
+
+    for route, route_no in zip(all_routes, all_route_no):
+        process_route_directions(route, route_no, all_route_stops)
+
     routeList.sort(key=lambda a: a["gtfsId"])
 
     with open(DATA_DIR / f"routeList.{co}.json", "w", encoding="UTF-8") as f:
