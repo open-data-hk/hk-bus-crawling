@@ -6,6 +6,7 @@ import time
 
 import httpx
 from crawl_utils import emitRequest
+from utils import DATA_DIR
 
 routes = {
     "1": ["Central Pier 4", "Sok Kwu Wan"],
@@ -38,10 +39,10 @@ async def getRouteStop(co):
         ).json()["data"]
         apiStops.append(stop)
 
-    with open("gtfs.json", "r", encoding="utf-8") as f:
+    with open(DATA_DIR / "gtfs.json", "r", encoding="utf-8") as f:
         gtfsZh = json.load(f)
 
-    with open("gtfs-en.json", "r", encoding="utf-8") as f:
+    with open(DATA_DIR / "gtfs-en.json", "r", encoding="utf-8") as f:
         gtfs = json.load(f)
         gtfsRoutes = gtfs["routeList"]
         gtfsStops = gtfs["stopList"]
@@ -91,10 +92,10 @@ async def getRouteStop(co):
             "long": apiStop["long"],
         }
 
-    with open("routeList.hkkf.json", "w", encoding="utf-8") as f:
+    with open(DATA_DIR / "routeList.hkkf.json", "w", encoding="utf-8") as f:
         f.write(json.dumps(routeList, ensure_ascii=False))
 
-    with open("stopList.hkkf.json", "w", encoding="utf-8") as f:
+    with open(DATA_DIR / "stopList.hkkf.json", "w", encoding="utf-8") as f:
         f.write(json.dumps(stopList, ensure_ascii=False))
 
 

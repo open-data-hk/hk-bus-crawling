@@ -5,14 +5,15 @@ from os import path
 
 import httpx
 from crawl_utils import emitRequest
+from utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
 
 async def getRouteStop(co):
     # define output name
-    ROUTE_LIST = "routeList." + co + ".json"
-    STOP_LIST = "stopList." + co + ".json"
+    ROUTE_LIST = DATA_DIR / ("routeList." + co + ".json")
+    STOP_LIST = DATA_DIR / ("stopList." + co + ".json")
 
     a_client = httpx.AsyncClient()
     # load route list and stop list if exist

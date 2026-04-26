@@ -7,6 +7,7 @@ import time
 
 import httpx
 from crawl_utils import emitRequest, get_request_limit
+from utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ async def getRouteStop(co):
     a_client = httpx.AsyncClient()
     # parse gtfs service_id
     serviceIdMap = {}
-    with open("gtfs/calendar.txt", "r", encoding="utf-8") as csvfile:
+    with open(DATA_DIR / "gtfs/calendar.txt", "r", encoding="utf-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [service_id, mon, tue, wed, thur, fri, sat, sun, *tmp] in reader:
@@ -193,12 +194,12 @@ async def getRouteStop(co):
 
     await asyncio.gather(*[get_routes_region(r) for r in ["HKI", "KLN", "NT"]])
 
-    with open(f"routeList.{co}.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / f"routeList.{co}.json", "w", encoding="UTF-8") as f:
         json.dump(routeList, f, ensure_ascii=False)
     logger.info("Route done")
 
     req_stops_limit = asyncio.Semaphore(get_request_limit())
-    with open("gtfs.json", "r", encoding="UTF-8") as f:
+    with open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8") as f:
         gtfs = json.load(f)
         gtfsStops = gtfs["stopList"]
 
@@ -224,14 +225,14 @@ async def getRouteStop(co):
         *[update_stop_loc(stop_id) for stop_id in sorted(stops.keys())]
     )
 
-    with open(f"stopList.{co}.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / f"stopList.{co}.json", "w", encoding="UTF-8") as f:
         json.dump(stops, f, ensure_ascii=False)
     for stop in stopCandidates:
         stopCandidates[stop]["tc_others"].discard(stopCandidates[stop]["tc_used"])
         stopCandidates[stop]["tc_others"] = sorted(stopCandidates[stop]["tc_others"])
         stopCandidates[stop]["en_others"].discard(stopCandidates[stop]["en_used"])
         stopCandidates[stop]["en_others"] = sorted(stopCandidates[stop]["en_others"])
-    with open(f"stopCandidates.{co}.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / f"stopCandidates.{co}.json", "w", encoding="UTF-8") as f:
 
         def set_default(obj):
             if isinstance(obj, set):

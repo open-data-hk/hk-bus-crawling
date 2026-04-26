@@ -2,6 +2,7 @@ import json
 from sys import stderr
 
 from haversine import Unit, haversine
+from utils import DATA_DIR
 
 routeList = []
 stopList = {}
@@ -53,9 +54,11 @@ def isGtfsMatch(knownRoute, newRoute):
 
 def importRouteListJson(co):
     _routeList = json.load(
-        open("routeFareList.%s.cleansed.json" % co, "r", encoding="UTF-8")
+        open(DATA_DIR / ("routeFareList.%s.cleansed.json" % co), "r", encoding="UTF-8")
     )
-    _stopList = json.load(open("stopList.%s.json" % co, "r", encoding="UTF-8"))
+    _stopList = json.load(
+        open(DATA_DIR / ("stopList.%s.json" % co), "r", encoding="UTF-8")
+    )
     for stopId, stop in _stopList.items():
         if stopId not in stopList:
             try:
@@ -205,8 +208,10 @@ routeList = smartUnique()
 for route in routeList:
     route["stops"] = {co: stops for co, stops in route["stops"]}
 
-holidays = json.load(open("holiday.json", "r", encoding="UTF-8"))
-serviceDayMap = json.load(open("gtfs.json", "r", encoding="UTF-8"))["serviceDayMap"]
+holidays = json.load(open(DATA_DIR / "holiday.json", "r", encoding="UTF-8"))
+serviceDayMap = json.load(open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8"))[
+    "serviceDayMap"
+]
 
 
 def standardizeDict(d):
@@ -226,8 +231,8 @@ db = standardizeDict(
     }
 )
 
-with open("routeFareList.mergeRoutes.json", "w", encoding="UTF-8") as f:
+with open(DATA_DIR / "routeFareList.mergeRoutes.json", "w", encoding="UTF-8") as f:
     f.write(json.dumps(db, ensure_ascii=False, indent=4))
 
-with open("routeFareList.mergeRoutes.min.json", "w", encoding="UTF-8") as f:
+with open(DATA_DIR / "routeFareList.mergeRoutes.min.json", "w", encoding="UTF-8") as f:
     f.write(json.dumps(db, ensure_ascii=False, separators=(",", ":")))

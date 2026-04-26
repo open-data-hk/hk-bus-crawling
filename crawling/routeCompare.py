@@ -11,6 +11,7 @@ import time
 import httpx
 import xxhash
 from crawl_utils import emitRequest
+from utils import DATA_DIR
 
 
 async def routeCompare():
@@ -18,10 +19,10 @@ async def routeCompare():
     r = await emitRequest("https://data.hkbus.app/routeFareList.min.json", a_client)
     r.encoding = "utf-8"
     oldDb = r.json()
-    newDb = json.load(open("routeFareList.min.json", "r", encoding="UTF-8"))
+    newDb = json.load(open(DATA_DIR / "routeFareList.min.json", "r", encoding="UTF-8"))
     changedStops = set()
 
-    os.makedirs("route-ts", exist_ok=True)
+    os.makedirs(DATA_DIR / "route-ts", exist_ok=True)
 
     def isRouteEqual(a, b):
         return xxhash.xxh3_64(str(a)).hexdigest() == xxhash.xxh3_64(str(b)).hexdigest()
@@ -46,13 +47,13 @@ async def routeCompare():
             or not isRouteEqual(oldDb["routeList"][newKey], newDb["routeList"][newKey])
         ):
             filename = re.sub(r"[\\\/\:\*\?\"\<\>\|]", "", newKey).upper()
-            with open(os.path.join("route-ts", filename), "w", encoding="utf-8") as f:
+            with open(DATA_DIR / "route-ts" / filename, "w", encoding="utf-8") as f:
                 f.write(str(int(time.time())))
 
     for oldKey in oldDb["routeList"]:
         if oldKey not in newDb["routeList"]:
             filename = re.sub(r"[\\\/\:\*\?\"\<\>\|]", "", oldKey).upper()
-            with open(os.path.join("route-ts", filename), "w", encoding="utf-8") as f:
+            with open(DATA_DIR / "route-ts" / filename, "w", encoding="utf-8") as f:
                 f.write(str(int(time.time())))
 
 

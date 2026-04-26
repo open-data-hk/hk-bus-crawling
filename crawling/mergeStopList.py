@@ -4,6 +4,7 @@ import math
 import time
 
 from haversine import Unit, haversine
+from utils import DATA_DIR
 
 
 def get_stop_group(route_list, stop_list, stop_seq_mapping, stop_list_grid, stop_id):
@@ -151,7 +152,9 @@ def get_stop_bearings(route_stops):
 
 def merge_stop_list():
     # Read the result from previous pipeline
-    with open("routeFareList.mergeRoutes.min.json", "r", encoding="UTF-8") as f:
+    with open(
+        DATA_DIR / "routeFareList.mergeRoutes.min.json", "r", encoding="UTF-8"
+    ) as f:
         db = json.load(f)
 
     route_list = db["routeList"]
@@ -200,7 +203,7 @@ def merge_stop_list():
 
     # Just dump the json in case of a need for trouble-shooting, but otherwise
     # we do not need this file
-    with open("stopMap.routeStopsSequence.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "stopMap.routeStopsSequence.json", "w", encoding="UTF-8") as f:
         json.dump(stop_seq_mapping, f)
 
     logger.info(
@@ -252,12 +255,12 @@ def merge_stop_list():
         f"Processed {count} stops ({group_count} groups) at {(time.time() - start_time) * 1000:.2f}ms"
     )
 
-    with open("stopMap.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "stopMap.json", "w", encoding="UTF-8") as f:
         json.dump(stop_map, f, indent=4)
 
     db["stopMap"] = stop_map
 
-    with open("routeFareList.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "routeFareList.json", "w", encoding="UTF-8") as f:
         json.dump(db, f, indent=4)
 
     # reduce size of routeFareList.min.json by rounding lat/lng values to 5 decimal places
@@ -277,13 +280,13 @@ def merge_stop_list():
         f"Reduced location lat/lng to 5 d.p. at {(time.time() - start_time) * 1000:.2f}ms"
     )
 
-    with open("routeFareList.alpha.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "routeFareList.alpha.json", "w", encoding="UTF-8") as f:
         json.dump(db, f, indent=4)
 
-    with open("routeFareList.min.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "routeFareList.min.json", "w", encoding="UTF-8") as f:
         json.dump(db, f)
 
-    with open("routeFareList.alpha.min.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "routeFareList.alpha.min.json", "w", encoding="UTF-8") as f:
         json.dump(db, f)
 
 

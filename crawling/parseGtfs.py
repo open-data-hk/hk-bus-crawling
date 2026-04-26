@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from crawl_utils import emitRequest, store_version
+from utils import DATA_DIR
 
 
 def takeFirst(elem):
@@ -18,14 +19,14 @@ def takeFirst(elem):
 
 async def parseGtfs():
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
-    if not path.isfile("gtfs.zip"):
+    if not path.isfile(DATA_DIR / "gtfs.zip"):
         r = await emitRequest(
             "https://static.data.gov.hk/td/pt-headway-tc/gtfs.zip", a_client
         )
-        open("gtfs.zip", "wb").write(r.content)
+        open(DATA_DIR / "gtfs.zip", "wb").write(r.content)
 
-    with zipfile.ZipFile("gtfs.zip", "r") as zip_ref:
-        zip_ref.extractall("gtfs")
+    with zipfile.ZipFile(DATA_DIR / "gtfs.zip", "r") as zip_ref:
+        zip_ref.extractall(DATA_DIR / "gtfs")
         version = min([f.date_time for f in zip_ref.infolist()])
         version = datetime.datetime(*version, tzinfo=ZoneInfo("Asia/Hong_Kong"))
         store_version("GTFS", version.isoformat())
@@ -33,9 +34,11 @@ async def parseGtfs():
     routeList = {}
     stopList = {}
     serviceDayMap = {}
-    routeJourneyTime = json.load(open("routeTime.json", "r", encoding="UTF-8"))
+    routeJourneyTime = json.load(
+        open(DATA_DIR / "routeTime.json", "r", encoding="UTF-8")
+    )
 
-    with open("gtfs/routes.txt", "r", encoding="UTF-8") as csvfile:
+    with open(DATA_DIR / "gtfs/routes.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [
@@ -68,7 +71,7 @@ async def parseGtfs():
             }
 
     # parse timetable
-    with open("gtfs/trips.txt", "r", encoding="UTF-8") as csvfile:
+    with open(DATA_DIR / "gtfs/trips.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [route_id, service_id, trip_id] in reader:
@@ -80,7 +83,7 @@ async def parseGtfs():
             if start_time not in routeList[route_id]["freq"][bound][calendar]:
                 routeList[route_id]["freq"][bound][calendar][start_time] = None
 
-    with open("gtfs/frequencies.txt", "r", encoding="UTF-8") as csvfile:
+    with open(DATA_DIR / "gtfs/frequencies.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [trip_id, _start_time, end_time, headway_secs] in reader:
@@ -91,7 +94,7 @@ async def parseGtfs():
             )
 
     # parse stop seq
-    with open("gtfs/stop_times.txt", "r", encoding="UTF-8") as csvfile:
+    with open(DATA_DIR / "gtfs/stop_times.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [
@@ -110,7 +113,7 @@ async def parseGtfs():
             routeList[route_id]["stops"][bound][stop_sequence] = stop_id
 
     # parse fares
-    with open("gtfs/fare_attributes.txt", "r", encoding="UTF-8") as csvfile:
+    with open(DATA_DIR / "gtfs/fare_attributes.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [
@@ -156,7 +159,7 @@ async def parseGtfs():
                     ret[x[i].lower().replace("lwb", "kmb")] = y[i if i < len(y) else 0]
         return ret
 
-    with open("gtfs/stops.txt", "r", encoding="UTF-8") as csvfile:
+    with open(DATA_DIR / "gtfs/stops.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [
@@ -175,7 +178,7 @@ async def parseGtfs():
                 "lng": float(stop_lon),
             }
 
-    with open("gtfs/calendar.txt", "r", encoding="UTF-8") as csvfile:
+    with open(DATA_DIR / "gtfs/calendar.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for line in reader:
@@ -184,7 +187,7 @@ async def parseGtfs():
             )
             serviceDayMap[service_id] = [sun, mon, tue, wed, thur, fri, sat]
 
-    with open("gtfs.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "gtfs.json", "w", encoding="UTF-8") as f:
         f.write(
             json.dumps(
                 {

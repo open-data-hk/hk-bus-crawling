@@ -9,6 +9,7 @@ import string
 import httpx
 from crawl_utils import emitRequest
 from pyproj import Transformer
+from utils import DATA_DIR
 
 res = []
 mtrStops = {}
@@ -77,7 +78,7 @@ async def main():
                     r.json(), q, stop, char + str(i), (char + str(char)) in stop
                 )
 
-    with open("exits.mtr.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "exits.mtr.json", "w", encoding="UTF-8") as f:
         f.write(
             json.dumps(
                 list({(v["name"]["zh"] + v["exit"]): v for v in res}.values()),

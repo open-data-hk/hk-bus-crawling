@@ -7,13 +7,14 @@ from os import path
 
 import httpx
 from crawl_utils import emitRequest
+from utils import DATA_DIR
 
 
 async def getRouteStop():
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
     # define output name
-    ROUTE_LIST = "routeList.kmb.json"
-    STOP_LIST = "stopList.kmb.json"
+    ROUTE_LIST = DATA_DIR / "routeList.kmb.json"
+    STOP_LIST = DATA_DIR / "stopList.kmb.json"
 
     stopList = {}
     if path.isfile(STOP_LIST):

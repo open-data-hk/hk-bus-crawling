@@ -9,6 +9,7 @@ import logging
 import httpx
 from crawl_utils import emitRequest
 from pyproj import Transformer
+from utils import DATA_DIR
 
 
 def filterStops(route):
@@ -69,7 +70,7 @@ async def getRouteStop(co="mtr"):
                 "long": lng,
             }
 
-    with open("routeList.mtr.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "routeList.mtr.json", "w", encoding="UTF-8") as f:
         f.write(
             json.dumps(
                 list(
@@ -85,7 +86,7 @@ async def getRouteStop(co="mtr"):
                 ensure_ascii=False,
             )
         )
-    with open("stopList.mtr.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "stopList.mtr.json", "w", encoding="UTF-8") as f:
         f.write(json.dumps(stopList, ensure_ascii=False))
 
 

@@ -8,6 +8,7 @@ import logging
 
 import httpx
 from crawl_utils import emitRequest
+from utils import DATA_DIR
 
 
 async def getRouteStop(co="lrtfeeder"):
@@ -77,14 +78,14 @@ async def getRouteStop(co="lrtfeeder"):
             "long": lng,
         }
 
-    with open("routeList.lrtfeeder.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "routeList.lrtfeeder.json", "w", encoding="UTF-8") as f:
         f.write(
             json.dumps(
                 [route for route in routeList.values() if len(route["stops"]) > 0],
                 ensure_ascii=False,
             )
         )
-    with open("stopList.lrtfeeder.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "stopList.lrtfeeder.json", "w", encoding="UTF-8") as f:
         f.write(json.dumps(stopList, ensure_ascii=False))
 
 
