@@ -9,6 +9,16 @@ from utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
+BASE_URL = "https://rt.data.gov.hk/v2/transport/nlb"
+
+
+def routes_url():
+    return BASE_URL + "/route.php?action=list"
+
+
+def stop_url(routeId: str):
+    return BASE_URL + "/stop.php?action=list&routeId=" + routeId
+
 
 async def getRouteStop(co):
     # define output name
@@ -23,9 +33,7 @@ async def getRouteStop(co):
         return
     else:
         # load routes
-        r = await emitRequest(
-            "https://rt.data.gov.hk/v2/transport/nlb/route.php?action=list", a_client
-        )
+        r = await emitRequest(routes_url(), a_client)
         for route in r.json()["routes"]:
             routeList.append(
                 {
@@ -51,11 +59,7 @@ async def getRouteStop(co):
             stopList = json.load(f)
 
     async def getRouteStop(routeId):
-        r = await emitRequest(
-            "https://rt.data.gov.hk/v2/transport/nlb/stop.php?action=list&routeId="
-            + routeId,
-            a_client,
-        )
+        r = await emitRequest(stop_url(routeId), a_client)
         try:
             return r.json()["stops"]
         except Exception as err:
