@@ -34,71 +34,84 @@ def route_stop_url(
     return BASE_URL + "/route-stop/" + co + "/" + route + "/" + direction
 
 
+req_route_stop_limit = asyncio.Semaphore(get_request_limit())
+req_stop_list_limit = asyncio.Semaphore(get_request_limit())
+
+# methods of single API request
+
+
+async def get_route_list(co, a_client) -> list[dict]:
+    r = await emitRequest(routes_url(co), a_client)
+    return r.json()["data"]
+
+
+async def get_stop(stopId, a_client) -> dict:
+    async with req_stop_list_limit:
+        r = await emitRequest(stop_url(stopId), a_client)
+    return r.json()["data"]
+
+
+async def get_route_stop(co: str, route: dict, a_client) -> dict:
+    if route.get("bound", 0) != 0 or route.get("stops", {}):
+        return route
+    route["stops"] = {}
+    for direction in ["inbound", "outbound"]:
+        r = await emitRequest(
+            route_stop_url(route["route"], direction, co),
+            a_client,
+        )
+        route["stops"][direction] = [stop["stop"] for stop in r.json()["data"]]
+    return route
+
+
+# methods of multiple API requests
+
+
+async def get_stop_list(stops, a_client) -> list[dict]:
+    ret = await asyncio.gather(*[get_stop(stop, a_client) for stop in stops])
+    return ret
+
+
+async def get_route_stop_list(co: str, route_list: list[dict], a_client) -> list[dict]:
+    ret = await asyncio.gather(
+        *[get_route_stop(co, route, a_client) for route in route_list]
+    )
+    return ret
+
+
 async def getRouteStop(co):
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
 
     # load route list and stop list if exist
-    routeList = {}
+    route_list: list[dict] = []
+    # TODO: check why return if route_list exists
     if path.isfile(ROUTE_LIST):
         return
     else:
         # load routes
-        r = await emitRequest(routes_url(co), a_client)
-        routeList = r.json()["data"]
+        route_list = await get_route_list(co, a_client)
 
-    _stops = []
-    stopList = {}
+    _stop_ids = []
+    stop_list = {}
     if path.isfile(STOP_LIST):
         with open(STOP_LIST, "r", encoding="UTF-8") as f:
-            stopList = json.load(f)
+            stop_list = json.load(f)
 
-    # function to load single stop info
-    req_stop_list_limit = asyncio.Semaphore(get_request_limit())
-
-    async def getStop(stopId):
-        async with req_stop_list_limit:
-            r = await emitRequest(stop_url(stopId), a_client)
-        return r.json()["data"]
-
-    # function to async load multiple stops info
-    async def getStopList(stops):
-        ret = await asyncio.gather(*[getStop(stop) for stop in stops])
-        return ret
-
-    req_route_stop_limit = asyncio.Semaphore(get_request_limit())
-
-    async def getRouteStop(param):
-        co, route = param
-        if route.get("bound", 0) != 0 or route.get("stops", {}):
-            return route
-        route["stops"] = {}
-        for direction in ["inbound", "outbound"]:
-            r = await emitRequest(
-                route_stop_url(route["route"], direction),
-                a_client,
-            )
-            route["stops"][direction] = [stop["stop"] for stop in r.json()["data"]]
-        return route
-
-    async def getRouteStopList():
-        ret = await asyncio.gather(*[getRouteStop((co, route)) for route in routeList])
-        return ret
-
-    routeList = await getRouteStopList()
-    for route in routeList:
+    route_list = await get_route_stop_list(co, route_list, a_client)
+    for route in route_list:
         for direction, stops in route["stops"].items():
             for stopId in stops:
-                _stops.append(stopId)
+                _stop_ids.append(stopId)
 
     # load stops for this route aync
-    _stops = sorted(set(_stops))
+    _stop_ids = sorted(set(_stop_ids))
 
-    stopInfos = list(zip(_stops, await getStopList(_stops)))
+    stopInfos = list(zip(_stop_ids, await get_stop_list(_stop_ids, a_client)))
     for stopId, stopInfo in stopInfos:
-        stopList[stopId] = stopInfo
+        stop_list[stopId] = stopInfo
 
     _routeList = []
-    for route in routeList:
+    for route in route_list:
         if route.get("bound", 0) != 0:
             _routeList.append(route)
             continue
@@ -131,7 +144,7 @@ async def getRouteStop(co):
                         ),
                         "stops": list(
                             filter(
-                                lambda stopId: bool(stopList[stopId]),
+                                lambda stopId: bool(stop_list[stopId]),
                                 route["stops"][bound],
                             )
                         ),
@@ -142,7 +155,7 @@ async def getRouteStop(co):
     with open(ROUTE_LIST, "w", encoding="UTF-8") as f:
         f.write(json.dumps(_routeList, ensure_ascii=False))
     with open(STOP_LIST, "w", encoding="UTF-8") as f:
-        f.write(json.dumps(stopList, ensure_ascii=False))
+        f.write(json.dumps(stop_list, ensure_ascii=False))
 
 
 if __name__ == "__main__":
