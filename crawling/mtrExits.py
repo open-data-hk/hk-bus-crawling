@@ -86,7 +86,7 @@ async def main():
         mtrStops[station_id] = {
             "name_tc": entry["Chinese Name"],
             "name_en": entry["English Name"],
-            "barrierFreeExits": [],
+            "barrierFreeExits": set(),
         }
 
     r = await emitRequest(
@@ -100,10 +100,27 @@ async def main():
             pattern = r"(?<![A-Za-z])([A-Z]\d*)(?![A-Za-z])"
             for exit in re.findall(pattern, entry["AJTextZh"]):
                 if entry["Station_No"] in mtrStops:
-                    mtrStops[entry["Station_No"]]["barrierFreeExits"].append(exit)
+                    mtrStops[entry["Station_No"]]["barrierFreeExits"].add(exit)
 
     # crawl exit geolocation
     for key, stop in mtrStops.items():
+
+        chn = stop["name_tc"]
+        barrier_free_exits = stop["barrierFreeExits"]
+        station_exits = exits[chn]
+
+        # Dataset bug: in 青衣站, mtr dataset has E出口
+        # but iGeoCom (and common understanding) not
+
+        for exit_code, feature in station_exits.items():
+            # e.g. if exit A is barrier free, then exit A2, A3 is barrier free
+            exit_code_no_digit = re.sub(r"[0-9]+", "", exit_code)
+            is_barrier_free = (exit_code in barrier_free_exits) or (
+                exit_code_no_digit in barrier_free_exits
+            )
+
+            pass
+
         q = "港鐵" + stop["name_tc"] + "站進出口"
         r = await emitRequest(
             "https://geodata.gov.hk/gs/api/v1.0.0/locationSearch?q=" + q, a_client
