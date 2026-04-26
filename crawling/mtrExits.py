@@ -45,6 +45,10 @@ async def main():
     exits = {}
     igeocom_features = query_igeocom_geojson(class_code="TRS", type_code="MTA")
 
+    # station name in igeocom is different (considered wrong)
+    # the 力(igeocom) vs 刀(mtr) part in "Lai"
+    chn_map = {"荔景": "茘景", "荔枝角": "茘枝角"}
+
     for feature in igeocom_features:
         raw_chi_name = feature["properties"]["CHINESENAME"]
         # general pattern 香港鐵路九龍站-D2進出口
@@ -55,6 +59,10 @@ async def main():
             continue
         chi_name = m.group(1)
         exit_code = m.group(2)
+
+        if chi_name in chn_map:
+            chi_name = chn_map[chi_name]
+
         if chi_name not in exits:
             exits[chi_name] = {}
 
