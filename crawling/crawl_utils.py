@@ -4,6 +4,7 @@ import logging
 import os
 
 import httpx
+from utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +44,11 @@ def store_version(key: str, version: str):
     logger.info(f"{key} version: {version}")
     # "0" is prepended in filename so that this file appears first in Github directory listing
     try:
-        with open("0versions.json", "r") as f:
+        with open(DATA_DIR / "0versions.json", "r") as f:
             version_dict = json.load(f)
     except BaseException:
         version_dict = {}
     version_dict[key] = version
     version_dict = dict(sorted(version_dict.items()))
-    with open("0versions.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "0versions.json", "w", encoding="UTF-8") as f:
         json.dump(version_dict, f, indent=4)

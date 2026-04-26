@@ -2,12 +2,14 @@
 
 import json
 
-with open("gtfs.json", "r", encoding="UTF-8") as f:
+from utils import DATA_DIR
+
+with open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8") as f:
     gtfs = json.load(f)
     gtfsRoutes = gtfs["routeList"]
     gtfsStops = gtfs["stopList"]
 
-with open("gtfs-en.json", "r", encoding="UTF-8") as f:
+with open(DATA_DIR / "gtfs-en.json", "r", encoding="UTF-8") as f:
     gtfsEn = json.load(f)
 
 routes = {
@@ -77,8 +79,8 @@ for route in routeList:
             "long": gtfsStops[stopId]["lng"],
         }
 
-with open("routeList.fortuneferry.json", "w", encoding="UTF-8") as f:
+with open(DATA_DIR / "routeList.fortuneferry.json", "w", encoding="UTF-8") as f:
     f.write(json.dumps(routeList, ensure_ascii=False))
 
-with open("stopList.fortuneferry.json", "w", encoding="UTF-8") as f:
+with open(DATA_DIR / "stopList.fortuneferry.json", "w", encoding="UTF-8") as f:
     f.write(json.dumps(stopList, ensure_ascii=False))

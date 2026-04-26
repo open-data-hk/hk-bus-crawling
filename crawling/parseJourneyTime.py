@@ -7,20 +7,21 @@ from os import path
 
 import httpx
 from crawl_utils import emitRequest, store_version
+from utils import DATA_DIR
 
 
 async def parseJourneyTime():
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
-    if not path.isfile("ROUTE_BUS.xml"):
+    if not path.isfile(DATA_DIR / "ROUTE_BUS.xml"):
         r = await emitRequest(
             "https://static.data.gov.hk/td/routes-fares-xml/ROUTE_BUS.xml", a_client
         )
         r.encoding = "utf-8"
-        with open("ROUTE_BUS.xml", "w", encoding="UTF-8") as f:
+        with open(DATA_DIR / "ROUTE_BUS.xml", "w", encoding="UTF-8") as f:
             f.write(r.text)
 
     routeTimeList = {}
-    tree = ET.parse("ROUTE_BUS.xml")
+    tree = ET.parse(DATA_DIR / "ROUTE_BUS.xml")
     root = tree.getroot()
     version = datetime.fromisoformat(root.attrib["generated"] + "+08:00")
     store_version("routes-fares-xml/ROUTE_BUS", version.isoformat())
@@ -35,7 +36,7 @@ async def parseJourneyTime():
                 "journeyTime": route.find("JOURNEY_TIME").text,
             }
 
-    with open("routeTime.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "routeTime.json", "w", encoding="UTF-8") as f:
         f.write(json.dumps(routeTimeList, ensure_ascii=False))
 
 

@@ -2,11 +2,12 @@ import json
 import sys
 
 from haversine import haversine
+from utils import DATA_DIR
 
 INFINITY_DIST = 1000000
 DIST_DIFF = 600
 
-with open("gtfs.json", "r", encoding="UTF-8") as f:
+with open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8") as f:
     gtfs = json.load(f)
     gtfsRoutes = gtfs["routeList"]
     gtfsStops = gtfs["stopList"]
@@ -141,9 +142,9 @@ def printStopMatches(bestMatch, gtfsStops, stopList, co):
 
 def matchRoutes(co):
     print(co)
-    with open("routeList.%s.json" % co, "r", encoding="utf-8") as f:
+    with open(DATA_DIR / ("routeList.%s.json" % co), "r", encoding="utf-8") as f:
         routeList = json.load(f)
-    with open("stopList.%s.json" % co, "r", encoding="utf-8") as f:
+    with open(DATA_DIR / ("stopList.%s.json" % co), "r", encoding="utf-8") as f:
         stopList = json.load(f)
 
     routeCandidates = []
@@ -281,7 +282,7 @@ def matchRoutes(co):
         route for route in routeList if "found" not in route or "fares" in route
     ]
 
-    with open("routeFareList.%s.json" % co, "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / ("routeFareList.%s.json" % co), "w", encoding="UTF-8") as f:
         f.write(json.dumps(routeList, ensure_ascii=False))
 
 
@@ -305,5 +306,5 @@ for routeId, route in gtfsRoutes.items():
 routeFareList = {}
 
 
-with open("routeGtfs.all.json", "w", encoding="UTF-8") as f:
+with open(DATA_DIR / "routeGtfs.all.json", "w", encoding="UTF-8") as f:
     f.write(json.dumps(gtfsRoutes, ensure_ascii=False, indent=4))

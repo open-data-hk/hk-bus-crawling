@@ -9,6 +9,7 @@ import logging
 import httpx
 from crawl_utils import emitRequest
 from pyproj import Transformer
+from utils import DATA_DIR
 
 # List of Circular Routes
 circularRoutes = ("705", "706")
@@ -94,14 +95,14 @@ async def getRouteStop(co="lightRail"):
                 logger.exception(f"Error parsing {url}: {r.text}")
                 raise
 
-    with open("routeList.lightRail.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "routeList.lightRail.json", "w", encoding="UTF-8") as f:
         f.write(
             json.dumps(
                 [route for route in routeList.values() if len(route["stops"]) > 0],
                 ensure_ascii=False,
             )
         )
-    with open("stopList.lightRail.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "stopList.lightRail.json", "w", encoding="UTF-8") as f:
         f.write(json.dumps(stopList, ensure_ascii=False))
 
 
