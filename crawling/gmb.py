@@ -41,6 +41,15 @@ async def get_routes_region(region: str, a_client) -> dict[str, Any]:
         return r.json()["data"]
 
 
+req_route_limit = asyncio.Semaphore(get_request_limit())
+
+
+async def get_route(region: str, route_no: str, a_client):
+    async with req_route_limit:
+        r = await emitRequest(route_url(region, route_no), a_client)
+        return r.json()["data"]
+
+
 async def getRouteStop(co):
     if (DATA_DIR / f"routeList.{co}.json").exists() and (
         DATA_DIR / f"stopList.{co}.json"
@@ -199,16 +208,6 @@ async def getRouteStop(co):
             if route["description_tc"].strip() != "正常班次":
                 service_type += 1
 
-    req_route_limit = asyncio.Semaphore(get_request_limit())
-
-    async def get_route(region: str, route_no):
-        async with req_route_limit:
-            r = await emitRequest(route_url(region, route_no), a_client)
-            await asyncio.gather(
-                *[get_route_directions(route, route_no) for route in r.json()["data"]]
-            )
-        routeList.sort(key=lambda a: a["gtfsId"])
-
     REGIONS = ["HKI", "KLN", "NT"]
 
     all_region_routes = await asyncio.gather(
@@ -223,9 +222,21 @@ async def getRouteStop(co):
         for route_no in region_route_no["routes"]
     ]
 
-    await asyncio.gather(
-        *[get_route(region, route) for region, route in all_region_route_no]
+    all_route_no = [route_no for _, route_no in all_region_route_no]
+
+    all_routes = await asyncio.gather(
+        *[get_route(region, route, a_client) for region, route in all_region_route_no]
     )
+
+    # TODO: save routes as raw files
+
+    await asyncio.gather(
+        *[
+            get_route_directions(route, route_no)
+            for route, route_no in zip(all_routes, all_route_no)
+        ]
+    )
+    routeList.sort(key=lambda a: a["gtfsId"])
 
     with open(DATA_DIR / f"routeList.{co}.json", "w", encoding="UTF-8") as f:
         json.dump(routeList, f, ensure_ascii=False)
