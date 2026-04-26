@@ -8,8 +8,7 @@ import logging
 
 import httpx
 from crawl_utils import emitRequest
-from pyproj import Transformer
-from utils import DATA_DIR
+from utils import DATA_DIR, query_igeocom_geojson
 
 BASE_URL = "https://opendata.mtr.com.hk/data"
 GEODATA_URL = "https://geodata.gov.hk/gs/api/v1.0.0"
@@ -17,10 +16,6 @@ GEODATA_URL = "https://geodata.gov.hk/gs/api/v1.0.0"
 
 def lines_stations_url():
     return BASE_URL + "/mtr_lines_and_stations.csv"
-
-
-def location_search_url(query: str):
-    return GEODATA_URL + "/locationSearch?q=" + query
 
 
 def filterStops(route):
@@ -34,10 +29,18 @@ async def getRouteStop(co="mtr"):
     ).exists():
         return
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
-    epsgTransformer = Transformer.from_crs("epsg:2326", "epsg:4326")
 
     routeList = {}
     stopList = {}
+
+    igeocom_features = query_igeocom_geojson(class_code="TRS", type_code="RSN")
+    stations = {}
+
+    for feature in igeocom_features:
+        raw_chi_name = feature["properties"]["CHINESENAME"]
+        # e.g. 香港鐵路粉嶺站 -> 粉嶺
+        chi_name = raw_chi_name.replace("香港鐵路", "").replace("站", "")
+        stations[chi_name] = feature
 
     r = await emitRequest(lines_stations_url(), a_client)
     r.encoding = "utf-8"
@@ -67,12 +70,13 @@ async def getRouteStop(co="mtr"):
         routeList[route + "_" + bound]["dest_en"] = eng
         routeList[route + "_" + bound]["stops"][int(float(seq))] = stopCode
         if stopCode not in stopList:
-            r = await emitRequest(
-                location_search_url("港鐵" + chn + "站"),
-                a_client,
-                headers={"Accept": "application/json"},
-            )
-            lat, lng = epsgTransformer.transform(r.json()[0]["y"], r.json()[0]["x"])
+            # station name in igeocom is different
+            # the 力 vs 刀 part in "Lai"
+            chn_map = {"茘景": "荔景", "茘枝角": "荔枝角"}
+            search_chn = chn if chn not in chn_map else chn_map[chn]
+            feature = stations[search_chn]
+
+            lng, lat = feature["geometry"]["coordinates"]
             stopList[stopCode] = {
                 "stop": stopCode,
                 "name_en": eng,
