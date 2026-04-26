@@ -139,107 +139,108 @@ async def getRouteStop(co):
 
     stopCandidates = {}
 
-    def process_route_directions(route, route_no, all_route_stops):
+    def process_route_directions(routes, route_no, all_route_stops):
         service_type = 2
-        for direction in route["directions"]:
-            key = f'{route["route_id"]}-{direction["route_seq"]}'
-            route_stops = all_route_stops[key]
-            for stop in route_stops:
-                stop_id = stop["stop_id"]
+        for route in routes:
+            for direction in route["directions"]:
+                key = f'{route["route_id"]}-{direction["route_seq"]}'
+                route_stops = all_route_stops[key]["route_stops"]
+                for stop in route_stops:
+                    stop_id = stop["stop_id"]
 
-                # GMB ETA API Spec: "A stop may have different names under different routes"
-                # While hk-bus-crawling only allows one name per stop
-                # Try to strategically and deterministically pick a stop name
-                oldNameEn = (
-                    stops[str(stop_id)]["name_en"] if str(stop_id) in stops else ""
-                )
-                oldNameTc = (
-                    stops[str(stop_id)]["name_tc"] if str(stop_id) in stops else ""
-                )
-                newNameEn = stop["name_en"].strip()
-                newNameTc = stop["name_tc"].strip()
-                useNameEn = oldNameEn
-                useNameTc = oldNameTc
-                toReplace = False
-
-                # Prefer longer Chinese names. They are usually more specific
-                # e.g. "常安街, 柴灣消防局對面" over "常安街77號"
-                # e.g. "小西灣道, 香港學術及職業資歷評審局外" over "小西灣道, 近曉翠街"
-                # e.g. "暢運道, 近國際都會都會大廈" over "暢運道, 近紅磡站", "紅磡站, 暢運道"
-                # Note: "柴灣道, 筲箕灣官立中學外" over "柴灣道, 筲箕灣官立中學"
-                # Note: "大坑東道, 大坑東遊樂場外" over "大坑東道,大坑東遊樂場外"
-                # Note: "亞皆老街113號, 太平道" over "亞皆老街, 嘉麗園", "亞皆老街, 近嘉麗園", "亞皆老街113號"
-                # Note: "貿業路, 寶琳港鐵站外" "Po Lam Station" over "貿業路, 近寶琳站" "Mau Yip Road,
-                # near Po Lam Station"
-                if len(newNameTc) > len(oldNameTc):
-                    toReplace = True
-                elif len(newNameTc) == len(oldNameTc):
-                    if newNameTc > oldNameTc:
-                        toReplace = True
-                    elif newNameTc == oldNameTc:
-                        # Prefer English names with more words
-                        if len(newNameEn.split()) > len(oldNameEn.split()):
-                            toReplace = True
-                        elif len(newNameEn.split()) == len(oldNameEn.split()):
-                            if len(newNameEn) > len(oldNameEn):
-                                toReplace = True
-                            elif len(newNameEn) == len(oldNameEn):
-                                if newNameEn > oldNameEn:
-                                    toReplace = True
-                if toReplace:
-                    useNameTc = newNameTc
-                    useNameEn = newNameEn
-
-                if oldNameEn.upper() == newNameEn.upper():
-                    # Prefer fewer uppercase letters
-                    # e.g. "Pok Fu Lam Road" over "POK FU LAM ROAD"
-                    # e.g. "Tsing Yi Heung Sze Wui Road, Near Greenfield Garden Block 3"
-                    # over "TSING YI HEUNG SZE WUI ROAD, near Greenfield Garden Block 3"
-                    useNameEn = (
-                        newNameEn
-                        if sum(1 for c in newNameEn if c.isupper())
-                        < sum(1 for c in oldNameEn if c.isupper())
-                        else oldNameEn
+                    # GMB ETA API Spec: "A stop may have different names under different routes"
+                    # While hk-bus-crawling only allows one name per stop
+                    # Try to strategically and deterministically pick a stop name
+                    oldNameEn = (
+                        stops[str(stop_id)]["name_en"] if str(stop_id) in stops else ""
                     )
+                    oldNameTc = (
+                        stops[str(stop_id)]["name_tc"] if str(stop_id) in stops else ""
+                    )
+                    newNameEn = stop["name_en"].strip()
+                    newNameTc = stop["name_tc"].strip()
+                    useNameEn = oldNameEn
+                    useNameTc = oldNameTc
+                    toReplace = False
 
-                if str(stop_id) not in stopCandidates:
-                    stopCandidates[str(stop_id)] = {
-                        "en_used": "",
-                        "en_others": set(),
-                        "tc_used": "",
-                        "tc_others": set(),
+                    # Prefer longer Chinese names. They are usually more specific
+                    # e.g. "常安街, 柴灣消防局對面" over "常安街77號"
+                    # e.g. "小西灣道, 香港學術及職業資歷評審局外" over "小西灣道, 近曉翠街"
+                    # e.g. "暢運道, 近國際都會都會大廈" over "暢運道, 近紅磡站", "紅磡站, 暢運道"
+                    # Note: "柴灣道, 筲箕灣官立中學外" over "柴灣道, 筲箕灣官立中學"
+                    # Note: "大坑東道, 大坑東遊樂場外" over "大坑東道,大坑東遊樂場外"
+                    # Note: "亞皆老街113號, 太平道" over "亞皆老街, 嘉麗園", "亞皆老街, 近嘉麗園", "亞皆老街113號"
+                    # Note: "貿業路, 寶琳港鐵站外" "Po Lam Station" over "貿業路, 近寶琳站" "Mau Yip Road,
+                    # near Po Lam Station"
+                    if len(newNameTc) > len(oldNameTc):
+                        toReplace = True
+                    elif len(newNameTc) == len(oldNameTc):
+                        if newNameTc > oldNameTc:
+                            toReplace = True
+                        elif newNameTc == oldNameTc:
+                            # Prefer English names with more words
+                            if len(newNameEn.split()) > len(oldNameEn.split()):
+                                toReplace = True
+                            elif len(newNameEn.split()) == len(oldNameEn.split()):
+                                if len(newNameEn) > len(oldNameEn):
+                                    toReplace = True
+                                elif len(newNameEn) == len(oldNameEn):
+                                    if newNameEn > oldNameEn:
+                                        toReplace = True
+                    if toReplace:
+                        useNameTc = newNameTc
+                        useNameEn = newNameEn
+
+                    if oldNameEn.upper() == newNameEn.upper():
+                        # Prefer fewer uppercase letters
+                        # e.g. "Pok Fu Lam Road" over "POK FU LAM ROAD"
+                        # e.g. "Tsing Yi Heung Sze Wui Road, Near Greenfield Garden Block 3"
+                        # over "TSING YI HEUNG SZE WUI ROAD, near Greenfield Garden Block 3"
+                        useNameEn = (
+                            newNameEn
+                            if sum(1 for c in newNameEn if c.isupper())
+                            < sum(1 for c in oldNameEn if c.isupper())
+                            else oldNameEn
+                        )
+
+                    if str(stop_id) not in stopCandidates:
+                        stopCandidates[str(stop_id)] = {
+                            "en_used": "",
+                            "en_others": set(),
+                            "tc_used": "",
+                            "tc_others": set(),
+                        }
+                    stopCandidates[str(stop_id)]["en_used"] = useNameEn
+                    stopCandidates[str(stop_id)]["en_others"].add(newNameEn)
+                    stopCandidates[str(stop_id)]["tc_used"] = useNameTc
+                    stopCandidates[str(stop_id)]["tc_others"].add(newNameTc)
+
+                    stops[str(stop_id)] = {
+                        "stop": str(stop_id),
+                        "name_en": useNameEn,
+                        "name_tc": useNameTc,
                     }
-                stopCandidates[str(stop_id)]["en_used"] = useNameEn
-                stopCandidates[str(stop_id)]["en_others"].add(newNameEn)
-                stopCandidates[str(stop_id)]["tc_used"] = useNameTc
-                stopCandidates[str(stop_id)]["tc_others"].add(newNameTc)
-
-                stops[str(stop_id)] = {
-                    "stop": str(stop_id),
-                    "name_en": useNameEn,
-                    "name_tc": useNameTc,
-                }
-            routeList.append(
-                {
-                    "gtfsId": str(route["route_id"]),
-                    "route": route_no,
-                    "orig_tc": direction["orig_tc"],
-                    "orig_en": direction["orig_en"],
-                    "dest_tc": direction["dest_tc"],
-                    "dest_en": direction["dest_en"],
-                    "bound": "O" if direction["route_seq"] == 1 else "I",
-                    "service_type": (
-                        1
-                        if route["description_tc"].strip() == "正常班次"
-                        else service_type
-                    ),
-                    "stops": [str(stop["stop_id"]) for stop in route_stops],
-                    "freq": getFreq(direction["headways"], serviceIdMap),
-                }
-            )
-            # print(routeList)
-            if route["description_tc"].strip() != "正常班次":
-                service_type += 1
+                routeList.append(
+                    {
+                        "gtfsId": str(route["route_id"]),
+                        "route": route_no,
+                        "orig_tc": direction["orig_tc"],
+                        "orig_en": direction["orig_en"],
+                        "dest_tc": direction["dest_tc"],
+                        "dest_en": direction["dest_en"],
+                        "bound": "O" if direction["route_seq"] == 1 else "I",
+                        "service_type": (
+                            1
+                            if route["description_tc"].strip() == "正常班次"
+                            else service_type
+                        ),
+                        "stops": [str(stop["stop_id"]) for stop in route_stops],
+                        "freq": getFreq(direction["headways"], serviceIdMap),
+                    }
+                )
+                # print(routeList)
+                if route["description_tc"].strip() != "正常班次":
+                    service_type += 1
 
     REGIONS = ["HKI", "KLN", "NT"]
 
@@ -306,8 +307,9 @@ async def getRouteStop(co):
             json.dumps(all_route_stops, ensure_ascii=False), encoding="UTF-8"
         )
 
-    for route, route_no in zip(all_routes, all_route_no):
-        process_route_directions(route, route_no, all_route_stops)
+    for route_key, region_routes in all_routes.items():
+        region, route_no = route_key.split("-")
+        process_route_directions(region_routes, route_no, all_route_stops)
 
     routeList.sort(key=lambda a: a["gtfsId"])
 
