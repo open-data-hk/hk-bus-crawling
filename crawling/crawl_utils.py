@@ -4,7 +4,8 @@ import logging
 import os
 
 import httpx
-from utils import DATA_DIR
+
+from .utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
 

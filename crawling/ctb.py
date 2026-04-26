@@ -2,12 +2,30 @@ import asyncio
 import json
 import logging
 from os import path
+from typing import Literal
 
 import httpx
-from crawl_utils import emitRequest, get_request_limit
-from utils import DATA_DIR
+
+from .crawl_utils import emitRequest, get_request_limit
+from .utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
+
+BASE_URL = "https://rt.data.gov.hk/v2/transport/citybus"
+
+
+def routes_url(co: str = "ctb"):
+    return BASE_URL + "/route/" + co
+
+
+def stop_url(stopId: str):
+    return BASE_URL + "/stop/" + stopId
+
+
+def route_stop_url(
+    route: str, direction: Literal["inbound", "outbound"], co: str = "ctb"
+):
+    return BASE_URL + "/route-stop/" + co + "/" + route + "/" + direction
 
 
 async def getRouteStop(co):
@@ -22,9 +40,7 @@ async def getRouteStop(co):
         return
     else:
         # load routes
-        r = await emitRequest(
-            "https://rt.data.gov.hk/v2/transport/citybus/route/" + co, a_client
-        )
+        r = await emitRequest(routes_url(co), a_client)
         routeList = r.json()["data"]
 
     _stops = []
@@ -38,9 +54,7 @@ async def getRouteStop(co):
 
     async def getStop(stopId):
         async with req_stop_list_limit:
-            r = await emitRequest(
-                "https://rt.data.gov.hk/v2/transport/citybus/stop/" + stopId, a_client
-            )
+            r = await emitRequest(stop_url(stopId), a_client)
         return r.json()["data"]
 
     # function to async load multiple stops info
@@ -57,12 +71,7 @@ async def getRouteStop(co):
         route["stops"] = {}
         for direction in ["inbound", "outbound"]:
             r = await emitRequest(
-                "https://rt.data.gov.hk/v2/transport/citybus/route-stop/"
-                + co.upper()
-                + "/"
-                + route["route"]
-                + "/"
-                + direction,
+                route_stop_url(route["route"], direction),
                 a_client,
             )
             route["stops"][direction] = [stop["stop"] for stop in r.json()["data"]]
