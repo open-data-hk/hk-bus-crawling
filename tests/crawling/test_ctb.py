@@ -1,3 +1,6 @@
+import json
+from pathlib import Path
+
 from crawling.ctb import route_stop_url, routes_url, stop_url
 
 
@@ -23,3 +26,32 @@ def test_route_stop_url():
         route_stop_url("20A", "inbound")
         == "https://rt.data.gov.hk/v2/transport/citybus/route-stop/ctb/20A/inbound"
     )
+
+
+def test_identical_files():
+    stop_list_snapshot_file = "tests/snapshots/stopList.ctb.json"
+    route_list_snapshot_file = "tests/snapshots/routeList.ctb.json"
+
+    stop_list_data_file = "data/stopList.ctb.json"
+    route_list_data_file = "data/routeList.ctb.json"
+
+    stop_list_data_text = Path(stop_list_data_file).read_text(encoding="UTF-8")
+    route_list_data_text = Path(route_list_data_file).read_text(encoding="UTF-8")
+
+    stop_list_snapshot_text = Path(stop_list_snapshot_file).read_text(encoding="UTF-8")
+    route_list_snapshot_text = Path(route_list_snapshot_file).read_text(
+        encoding="UTF-8"
+    )
+
+    stop_list_data = json.loads(stop_list_data_text)
+    route_list_data = json.loads(route_list_data_text)
+    stop_list_snapshot = json.loads(stop_list_snapshot_text)
+    route_list_snapshot = json.loads(route_list_snapshot_text)
+
+    for stop_id, stop_data in stop_list_data.items():
+        # data_timestamp could be inconsistent
+        del stop_data["data_timestamp"]
+        del stop_list_snapshot[stop_id]["data_timestamp"]
+        assert stop_data == stop_list_snapshot[stop_id]
+    for idx, route in enumerate(route_list_data):
+        assert route == route_list_snapshot[idx]
