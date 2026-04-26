@@ -5,7 +5,10 @@ import os
 
 import httpx
 
-from .utils import DATA_DIR
+try:
+    from .utils import DATA_DIR
+except ImportError:
+    from utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
