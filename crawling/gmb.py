@@ -50,10 +50,12 @@ async def get_routes_region(region: str, route_nos_by_region: dict, a_client) ->
 req_route_limit = asyncio.Semaphore(get_request_limit())
 
 
-async def get_route(region: str, route_no: str, a_client):
+async def get_route(region: str, route_no: str, all_routes: dict, a_client) -> None:
     async with req_route_limit:
         r = await emitRequest(route_url(region, route_no), a_client)
-        return r.json()["data"]
+        result = r.json()["data"]
+        key = f"{region}-{route_no}"
+        all_routes[key] = result
 
 
 async def get_route_stops(
@@ -262,17 +264,18 @@ async def getRouteStop(co):
 
     all_route_no = [route_no for _, route_no in all_region_route_no]
 
+    # routes key by "{region}-{route_no}", e.g. KLN-82
+    all_routes: dict[str, list[dict]] = {}
+
     if RAW_ROUTE_LIST.exists():
         logger.info(f"{RAW_ROUTE_LIST} already exists, loading...")
         all_routes = json.loads(RAW_ROUTE_LIST.read_text("utf-8"))
     else:
-        all_routes = list(
-            await asyncio.gather(
-                *[
-                    get_route(region, route, a_client)
-                    for region, route in all_region_route_no
-                ]
-            )
+        await asyncio.gather(
+            *[
+                get_route(region, route, all_routes, a_client)
+                for region, route in all_region_route_no
+            ]
         )
         RAW_ROUTE_LIST.write_text(
             json.dumps(all_routes, ensure_ascii=False), encoding="UTF-8"
