@@ -289,7 +289,7 @@ async def getRouteStop(co):
         all_route_stops = {}
         all_route_directions = [
             (route["route_id"], direction["route_seq"])
-            for single_route_no_routes in all_routes
+            for route_key, single_route_no_routes in all_routes.items()
             for route in single_route_no_routes
             for direction in route["directions"]
         ]
