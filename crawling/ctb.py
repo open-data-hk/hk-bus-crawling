@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 from os import path
+from pathlib import Path
 from typing import Literal
 
 import httpx
@@ -12,6 +13,11 @@ from .utils import DATA_DIR
 logger = logging.getLogger(__name__)
 
 COMPANY_CODE = "ctb"
+
+# Raw list files
+RAW_ROUTE_LIST = DATA_DIR / ("ctb.raw.routeList.json")
+RAW_ROUTE_STOP_LIST = DATA_DIR / ("ctb.raw.routeStopList.json")
+RAW_STOP_LIST = DATA_DIR / ("ctb.raw.stopList.json")
 
 # define output name
 ROUTE_LIST = DATA_DIR / ("routeList." + COMPANY_CODE + ".json")
@@ -39,6 +45,11 @@ req_stop_list_limit = asyncio.Semaphore(get_request_limit())
 
 # methods of single API request
 
+# dirty way to store all route stop list
+# TODO: move cache inside the function
+# key: {route}-{I/O}
+route_stop_list_cache = {}
+
 
 async def get_route_list(co, a_client) -> list[dict]:
     logger.info(f"Fetching route list of {COMPANY_CODE}")
@@ -62,6 +73,9 @@ async def get_route_stop(co: str, route: dict, a_client) -> dict:
             a_client,
         )
         route["stops"][direction] = [stop["stop"] for stop in r.json()["data"]]
+
+        direction_code = "I" if direction == "inbound" else "O"
+        route_stop_list_cache[f"{route['route']}-{direction_code}"] = r.json()["data"]
     return route
 
 
@@ -94,6 +108,9 @@ async def getRouteStop(co):
     else:
         # load routes
         route_list = await get_route_list(co, a_client)
+        Path(RAW_ROUTE_LIST).write_text(
+            json.dumps(route_list, ensure_ascii=False), encoding="UTF-8"
+        )
 
     _stop_ids = []
     stop_list = {}
@@ -102,6 +119,9 @@ async def getRouteStop(co):
             stop_list = json.load(f)
 
     route_list = await get_route_stop_list(co, route_list, a_client)
+    Path(RAW_ROUTE_STOP_LIST).write_text(
+        json.dumps(route_stop_list_cache, ensure_ascii=False), encoding="UTF-8"
+    )
 
     logger.info(f"Preparing data of {COMPANY_CODE}")
 
@@ -113,7 +133,12 @@ async def getRouteStop(co):
     # load stops for this route aync
     _stop_ids = sorted(set(_stop_ids))
 
-    stopInfos = list(zip(_stop_ids, await get_stop_list(_stop_ids, a_client)))
+    stop_list_raw = await get_stop_list(_stop_ids, a_client)
+    Path(RAW_STOP_LIST).write_text(
+        json.dumps(stop_list_raw, ensure_ascii=False), encoding="UTF-8"
+    )
+
+    stopInfos = list(zip(_stop_ids, stop_list_raw))
     for stopId, stopInfo in stopInfos:
         stop_list[stopId] = stopInfo
 
