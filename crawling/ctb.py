@@ -45,11 +45,6 @@ req_stop_list_limit = asyncio.Semaphore(get_request_limit())
 
 # methods of single API request
 
-# dirty way to store all route stop list
-# TODO: move cache inside the function
-# key: {route}-{I/O}
-route_stop_list_cache = {}
-
 
 async def get_route_list(co, a_client) -> list[dict]:
     logger.info(f"Fetching route list of {COMPANY_CODE}")
@@ -63,20 +58,22 @@ async def get_stop(stopId, a_client) -> dict:
     return r.json()["data"]
 
 
-async def get_route_stop(co: str, route: dict, a_client) -> dict:
-    if route.get("bound", 0) != 0 or route.get("stops", {}):
-        return route
-    route["stops"] = {}
+async def get_route_stop(co: str, route: str, a_client) -> dict[str, list[dict]]:
+    # TODO: remove this commented code if found useless
+    # if route.get("bound", 0) != 0 or route.get("stops", {}):
+    #     return route
+
+    route_stops = {}
     for direction in ["inbound", "outbound"]:
         r = await emitRequest(
-            route_stop_url(route["route"], direction, co),
+            route_stop_url(route, direction, co),
             a_client,
         )
-        route["stops"][direction] = [stop["stop"] for stop in r.json()["data"]]
+        result = r.json()["data"]
+        route_key = f"{route}-{direction}"
 
-        direction_code = "I" if direction == "inbound" else "O"
-        route_stop_list_cache[f"{route['route']}-{direction_code}"] = r.json()["data"]
-    return route
+        route_stops[route_key] = result
+    return route_stops
 
 
 # methods of multiple API requests
@@ -88,12 +85,20 @@ async def get_stop_list(stops, a_client) -> list[dict]:
     return ret
 
 
-async def get_route_stop_list(co: str, route_list: list[dict], a_client) -> list[dict]:
+async def get_route_stop_list(
+    co: str, route_list: list[dict], a_client
+) -> dict[str, list]:
     logger.info(f"Fetching route stop list of {COMPANY_CODE}")
-    ret = await asyncio.gather(
-        *[get_route_stop(co, route, a_client) for route in route_list]
+    route_stop_list = await asyncio.gather(
+        *[get_route_stop(co, route["route"], a_client) for route in route_list]
     )
-    return ret
+
+    route_stops = {}
+    for single_route_stops in route_stop_list:
+        for route_key, route_stop in single_route_stops.items():
+            route_stops[route_key] = route_stop
+
+    return route_stops
 
 
 async def getRouteStop(co):
@@ -118,17 +123,22 @@ async def getRouteStop(co):
         with open(STOP_LIST, "r", encoding="UTF-8") as f:
             stop_list = json.load(f)
 
-    route_list = await get_route_stop_list(co, route_list, a_client)
+    route_stop_list = await get_route_stop_list(co, route_list, a_client)
     Path(RAW_ROUTE_STOP_LIST).write_text(
-        json.dumps(route_stop_list_cache, ensure_ascii=False), encoding="UTF-8"
+        json.dumps(route_stop_list, ensure_ascii=False), encoding="UTF-8"
     )
 
     logger.info(f"Preparing data of {COMPANY_CODE}")
 
     for route in route_list:
-        for direction, stops in route["stops"].items():
-            for stopId in stops:
-                _stop_ids.append(stopId)
+
+        route["stops"] = {}
+        for direction in ["inbound", "outbound"]:
+            route_code = f"{route['route']}-{direction}"
+            route_stop = route_stop_list[route_code]
+            route["stops"][direction] = [stop["stop"] for stop in route_stop]
+
+            _stop_ids.extend(route["stops"][direction])
 
     # load stops for this route aync
     _stop_ids = sorted(set(_stop_ids))
