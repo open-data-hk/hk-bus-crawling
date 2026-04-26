@@ -90,8 +90,8 @@ jobs:
       - name: Update MD5
         shell: bash
         run: |
-          md5sum routeFareList.min.json | cut -f1 -d ' ' | tr -d $'\n' > routeFareList.md5
-          md5sum routeFareList.alpha.min.json | cut -f1 -d ' ' | tr -d $'\n' > routeFareList.alpha.md5
+          md5sum data/routeFareList.min.json | cut -f1 -d ' ' | tr -d $'\n' > data/routeFareList.md5
+          md5sum data/routeFareList.alpha.min.json | cut -f1 -d ' ' | tr -d $'\n' > data/routeFareList.alpha.md5
 
       - name: Archive crawling outputs
         uses: actions/upload-artifact@v7
@@ -100,25 +100,25 @@ jobs:
           name: Crawled Files
           retention-days: 14
           path: |
-            holiday.json
-            routeFareList*
-            routeList*
-            stopCandidates*
-            stopList*
-            stopMap*
-            routeTime.json
-            gtfs
-            gtfs.json
-            routeGtfs*
-            gtfs.zip
-            ROUTE_BUS.xml
-            route-ts/
-            exits.mtr.json
-            0versions.json
+            data/holiday.json
+            data/routeFareList*
+            data/routeList*
+            data/stopCandidates*
+            data/stopList*
+            data/stopMap*
+            data/routeTime.json
+            data/gtfs
+            data/gtfs.json
+            data/routeGtfs*
+            data/gtfs.zip
+            data/ROUTE_BUS.xml
+            data/route-ts/
+            data/exits.mtr.json
+            data/0versions.json
       - name: Update MD5
         run: |
-          md5sum routeFareList.min.json | cut -f1 -d ' ' | tr -d $'\n' > routeFareList.md5
-          md5sum routeFareList.alpha.min.json | cut -f1 -d ' ' | tr -d $'\n' > routeFareList.alpha.md5
+          md5sum data/routeFareList.min.json | cut -f1 -d ' ' | tr -d $'\n' > data/routeFareList.md5
+          md5sum data/routeFareList.alpha.min.json | cut -f1 -d ' ' | tr -d $'\n' > data/routeFareList.alpha.md5
       - name: create deployment folder
         shell: bash
         run: mkdir -p build
@@ -126,19 +126,19 @@ jobs:
         shell: bash
         run: |
           cp \
-          routeFareList.json \
-          routeFareList.min.json \
-          routeFareList.alpha.json \
-          routeFareList.alpha.min.json \
-          routeFareList.md5 \
-          routeFareList.alpha.md5  \
+          data/routeFareList.json \
+          data/routeFareList.min.json \
+          data/routeFareList.alpha.json \
+          data/routeFareList.alpha.min.json \
+          data/routeFareList.md5 \
+          data/routeFareList.alpha.md5  \
           CNAME \
-          exits.mtr.json \
-          0versions.json \
+          data/exits.mtr.json \
+          data/0versions.json \
           build/
       - name: cp route-ts into deployment folder
         shell: bash
-        run: cp -r route-ts build
+        run: cp -r data/route-ts build
 
       - name: Copy master build to alpha when no update or not exist
         if: github.ref_name == 'master' && steps.alpha-check.outputs.alpha_newer != 'yes'
