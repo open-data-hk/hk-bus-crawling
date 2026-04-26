@@ -112,10 +112,14 @@ async def getRouteStop(co):
         return
     else:
         # load routes
-        route_list = await get_route_list(co, a_client)
-        Path(RAW_ROUTE_LIST).write_text(
-            json.dumps(route_list, ensure_ascii=False), encoding="UTF-8"
-        )
+        raw_route_list_path = Path(RAW_ROUTE_LIST)
+        if raw_route_list_path.exists():
+            route_list = json.loads(raw_route_list_path.read_text("utf-8"))
+        else:
+            route_list = await get_route_list(co, a_client)
+            raw_route_list_path.write_text(
+                json.dumps(route_list, ensure_ascii=False), encoding="UTF-8"
+            )
 
     _stop_ids = []
     stop_list = {}
@@ -123,10 +127,14 @@ async def getRouteStop(co):
         with open(STOP_LIST, "r", encoding="UTF-8") as f:
             stop_list = json.load(f)
 
-    route_stop_list = await get_route_stop_list(co, route_list, a_client)
-    Path(RAW_ROUTE_STOP_LIST).write_text(
-        json.dumps(route_stop_list, ensure_ascii=False), encoding="UTF-8"
-    )
+    raw_route_stop_list_path = Path(RAW_ROUTE_STOP_LIST)
+    if raw_route_stop_list_path.exists():
+        route_stop_list = json.loads(raw_route_stop_list_path.read_text("utf-8"))
+    else:
+        route_stop_list = await get_route_stop_list(co, route_list, a_client)
+        raw_route_stop_list_path.write_text(
+            json.dumps(route_stop_list, ensure_ascii=False), encoding="UTF-8"
+        )
 
     logger.info(f"Preparing data of {COMPANY_CODE}")
 
@@ -143,10 +151,14 @@ async def getRouteStop(co):
     # load stops for this route aync
     _stop_ids = sorted(set(_stop_ids))
 
-    stop_list_raw = await get_stop_list(_stop_ids, a_client)
-    Path(RAW_STOP_LIST).write_text(
-        json.dumps(stop_list_raw, ensure_ascii=False), encoding="UTF-8"
-    )
+    raw_stop_list_path = Path(RAW_STOP_LIST)
+    if raw_stop_list_path.exists():
+        stop_list_raw = json.loads(raw_stop_list_path.read_text("utf-8"))
+    else:
+        stop_list_raw = await get_stop_list(_stop_ids, a_client)
+        raw_stop_list_path.write_text(
+            json.dumps(stop_list_raw, ensure_ascii=False), encoding="UTF-8"
+        )
 
     stopInfos = list(zip(_stop_ids, stop_list_raw))
     for stopId, stopInfo in stopInfos:
