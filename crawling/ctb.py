@@ -41,6 +41,7 @@ req_stop_list_limit = asyncio.Semaphore(get_request_limit())
 
 
 async def get_route_list(co, a_client) -> list[dict]:
+    logger.info(f"Fetching route list of {COMPANY_CODE}")
     r = await emitRequest(routes_url(co), a_client)
     return r.json()["data"]
 
@@ -68,11 +69,13 @@ async def get_route_stop(co: str, route: dict, a_client) -> dict:
 
 
 async def get_stop_list(stops, a_client) -> list[dict]:
+    logger.info(f"Fetching stop list of {COMPANY_CODE}")
     ret = await asyncio.gather(*[get_stop(stop, a_client) for stop in stops])
     return ret
 
 
 async def get_route_stop_list(co: str, route_list: list[dict], a_client) -> list[dict]:
+    logger.info(f"Fetching route stop list of {COMPANY_CODE}")
     ret = await asyncio.gather(
         *[get_route_stop(co, route, a_client) for route in route_list]
     )
@@ -86,6 +89,7 @@ async def getRouteStop(co):
     route_list: list[dict] = []
     # TODO: check why return if route_list exists
     if path.isfile(ROUTE_LIST):
+        logger.info(f"{ROUTE_LIST} already exist, skipping...")
         return
     else:
         # load routes
@@ -98,6 +102,9 @@ async def getRouteStop(co):
             stop_list = json.load(f)
 
     route_list = await get_route_stop_list(co, route_list, a_client)
+
+    logger.info(f"Preparing data of {COMPANY_CODE}")
+
     for route in route_list:
         for direction, stops in route["stops"].items():
             for stopId in stops:
