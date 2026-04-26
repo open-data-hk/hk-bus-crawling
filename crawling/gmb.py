@@ -12,6 +12,12 @@ from utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
+# Raw list files
+RAW_ROUTE_CODE_LIST = DATA_DIR / ("gmb.raw.routeCodeList.json")
+RAW_ROUTE_LIST = DATA_DIR / ("gmb.raw.routeList.json")
+RAW_ROUTE_STOP_LIST = DATA_DIR / ("gmb.raw.routeStopList.json")
+RAW_STOP_LIST = DATA_DIR / ("gmb.raw.stopList.json")
+
 BASE_URL = "https://data.etagmb.gov.hk"
 
 
@@ -232,44 +238,61 @@ async def getRouteStop(co):
 
     REGIONS = ["HKI", "KLN", "NT"]
 
-    all_region_routes = await asyncio.gather(
-        *[get_routes_region(r, a_client) for r in REGIONS]
-    )
-
-    # TODO: save region route codes as raw files
-
-    all_region_route_no = [
-        (region, route_no)
-        for region, region_route_no in zip(REGIONS, all_region_routes)
-        for route_no in region_route_no["routes"]
-    ]
+    if RAW_ROUTE_CODE_LIST.exists():
+        logger.info(f"{RAW_ROUTE_CODE_LIST} already exists, loading...")
+        all_region_route_no = json.loads(RAW_ROUTE_CODE_LIST.read_text("utf-8"))
+    else:
+        all_region_routes = await asyncio.gather(
+            *[get_routes_region(r, a_client) for r in REGIONS]
+        )
+        all_region_route_no = [
+            (region, route_no)
+            for region, region_route_no in zip(REGIONS, all_region_routes)
+            for route_no in region_route_no["routes"]
+        ]
+        RAW_ROUTE_CODE_LIST.write_text(
+            json.dumps(all_region_route_no, ensure_ascii=False), encoding="UTF-8"
+        )
 
     all_route_no = [route_no for _, route_no in all_region_route_no]
 
-    all_routes = await asyncio.gather(
-        *[get_route(region, route, a_client) for region, route in all_region_route_no]
-    )
-
-    # TODO: save routes as raw files
+    if RAW_ROUTE_LIST.exists():
+        logger.info(f"{RAW_ROUTE_LIST} already exists, loading...")
+        all_routes = json.loads(RAW_ROUTE_LIST.read_text("utf-8"))
+    else:
+        all_routes = list(
+            await asyncio.gather(
+                *[
+                    get_route(region, route, a_client)
+                    for region, route in all_region_route_no
+                ]
+            )
+        )
+        RAW_ROUTE_LIST.write_text(
+            json.dumps(all_routes, ensure_ascii=False), encoding="UTF-8"
+        )
 
     # key: {route_id}-{route_seq}, e.g. 2006408-1
-    all_route_stops = {}
-
-    all_route_directions = [
-        (route["route_id"], direction["route_seq"])
-        for single_route_code_routes in all_routes
-        for route in single_route_code_routes
-        for direction in route["directions"]
-    ]
-
-    await asyncio.gather(
-        *[
-            get_route_stops(route_id, route_seq, all_route_stops, a_client)
-            for route_id, route_seq in all_route_directions
+    if RAW_ROUTE_STOP_LIST.exists():
+        logger.info(f"{RAW_ROUTE_STOP_LIST} already exists, loading...")
+        all_route_stops = json.loads(RAW_ROUTE_STOP_LIST.read_text("utf-8"))
+    else:
+        all_route_stops = {}
+        all_route_directions = [
+            (route["route_id"], direction["route_seq"])
+            for single_route_code_routes in all_routes
+            for route in single_route_code_routes
+            for direction in route["directions"]
         ]
-    )
-
-    # TODO: save all_route_stops as raw files
+        await asyncio.gather(
+            *[
+                get_route_stops(route_id, route_seq, all_route_stops, a_client)
+                for route_id, route_seq in all_route_directions
+            ]
+        )
+        RAW_ROUTE_STOP_LIST.write_text(
+            json.dumps(all_route_stops, ensure_ascii=False), encoding="UTF-8"
+        )
 
     for route, route_no in zip(all_routes, all_route_no):
         process_route_directions(route, route_no, all_route_stops)
@@ -284,15 +307,23 @@ async def getRouteStop(co):
         gtfs = json.load(f)
         gtfsStops = gtfs["stopList"]
 
-    stops_fetch = {}
-    stop_ids_need_fetch = [
-        stop_id for stop_id in stops.keys() if stop_id not in gtfsStops
-    ]
-    await asyncio.gather(
-        *[get_stop(stop_id, stops_fetch, a_client) for stop_id in stop_ids_need_fetch]
-    )
-
-    # TODO: save stops_fetch as raw files
+    if RAW_STOP_LIST.exists():
+        logger.info(f"{RAW_STOP_LIST} already exists, loading...")
+        stops_fetch = json.loads(RAW_STOP_LIST.read_text("utf-8"))
+    else:
+        stops_fetch = {}
+        stop_ids_need_fetch = [
+            stop_id for stop_id in stops.keys() if stop_id not in gtfsStops
+        ]
+        await asyncio.gather(
+            *[
+                get_stop(stop_id, stops_fetch, a_client)
+                for stop_id in stop_ids_need_fetch
+            ]
+        )
+        RAW_STOP_LIST.write_text(
+            json.dumps(stops_fetch, ensure_ascii=False), encoding="UTF-8"
+        )
 
     for stop_id, _ in stops.items():
         if stop_id not in gtfsStops:
