@@ -66,25 +66,24 @@ async def main():
     r = await emitRequest(
         "https://opendata.mtr.com.hk/data/mtr_lines_and_stations.csv", a_client
     )
-    r.encoding = "utf-8"
-    reader = csv.reader(r.text.strip().split("\n"))
-    headers = next(reader, None)
+    r.encoding = "utf-8-sig"
+    reader = csv.DictReader(r.text.strip().split("\n"))
     for entry in reader:
-        mtrStops[entry[3]] = {
-            "name_tc": entry[4],
-            "name_en": entry[5],
+        mtrStops[entry["Station ID"]] = {
+            "name_tc": entry["Chinese Name"],
+            "name_en": entry["English Name"],
         }
 
     r = await emitRequest(
         "https://opendata.mtr.com.hk/data/barrier_free_facilities.csv", a_client
     )
-    r.encoding = "utf-8"
-    reader = csv.reader(r.text.strip().split("\n"))
+    r.encoding = "utf-8-sig"
+    reader = csv.DictReader(r.text.strip().split("\n"))
     for entry in reader:
-        if entry[2] == "Y" and entry[3] != "":
-            for exit in re.findall(" [A-Z][\\d]*", entry[3]):
-                if entry[0] in mtrStops:
-                    mtrStops[entry[0]][exit.strip()] = True
+        if entry["Value"] == "Y" and entry["AJTextEn"] != "":
+            for exit in re.findall(" [A-Z][\\d]*", entry["AJTextEn"]):
+                if entry["Station_No"] in mtrStops:
+                    mtrStops[entry["Station_No"]][exit.strip()] = True
 
     # crawl exit geolocation
     for key, stop in mtrStops.items():
