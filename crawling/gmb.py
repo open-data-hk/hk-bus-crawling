@@ -4,6 +4,7 @@ import csv
 import json
 import logging
 import time
+from typing import Any
 
 import httpx
 from crawl_utils import emitRequest, get_request_limit
@@ -28,6 +29,16 @@ def route_url(region: str, route_no: str):
 
 def stop_url(stop_id):
     return BASE_URL + "/stop/" + str(stop_id)
+
+
+# Single API request
+req_route_region_limit = asyncio.Semaphore(get_request_limit())
+
+
+async def get_routes_region(region: str, a_client) -> dict[str, Any]:
+    async with req_route_region_limit:
+        r = await emitRequest(region_routes_url(region), a_client)
+        return r.json()["data"]
 
 
 async def getRouteStop(co):
@@ -198,16 +209,23 @@ async def getRouteStop(co):
             )
         routeList.sort(key=lambda a: a["gtfsId"])
 
-    req_route_region_limit = asyncio.Semaphore(get_request_limit())
+    REGIONS = ["HKI", "KLN", "NT"]
 
-    async def get_routes_region(region: str):
-        async with req_route_region_limit:
-            r = await emitRequest(region_routes_url(region), a_client)
-            await asyncio.gather(
-                *[get_route(region, route) for route in r.json()["data"]["routes"]]
-            )
+    all_region_routes = await asyncio.gather(
+        *[get_routes_region(r, a_client) for r in REGIONS]
+    )
 
-    await asyncio.gather(*[get_routes_region(r) for r in ["HKI", "KLN", "NT"]])
+    # TODO: save region route codes as raw files
+
+    all_region_route_no = [
+        (region, route_no)
+        for region, region_route_no in zip(REGIONS, all_region_routes)
+        for route_no in region_route_no["routes"]
+    ]
+
+    await asyncio.gather(
+        *[get_route(region, route) for region, route in all_region_route_no]
+    )
 
     with open(DATA_DIR / f"routeList.{co}.json", "w", encoding="UTF-8") as f:
         json.dump(routeList, f, ensure_ascii=False)
