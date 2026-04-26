@@ -140,8 +140,8 @@ async def getRouteStop(co):
     stopCandidates = {}
 
     def process_route_directions(routes, route_no, all_route_stops):
-        service_type = 2
         for route in routes:
+            service_type = 2
             for direction in route["directions"]:
                 key = f'{route["route_id"]}-{direction["route_seq"]}'
                 route_stops = all_route_stops[key]["route_stops"]
