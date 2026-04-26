@@ -266,8 +266,6 @@ async def getRouteStop(co):
         for route_no in region_data["routes"]
     ]
 
-    all_route_no = [route_no for _, route_no in all_region_route_no]
-
     # routes key by "{region}-{route_no}", e.g. KLN-82
     all_routes: dict[str, list[dict]] = {}
 
