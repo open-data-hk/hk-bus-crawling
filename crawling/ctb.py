@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-from os import path
 from pathlib import Path
 from typing import Literal
 
@@ -101,7 +100,7 @@ async def prepare_data():
     # load route list and stop list if exist
     route_list: list[dict] = []
     # TODO: check why return if route_list exists
-    if path.isfile(ROUTE_LIST):
+    if ROUTE_LIST.exists():
         logger.info(f"{ROUTE_LIST} already exist, skipping...")
         return
     else:
@@ -117,7 +116,7 @@ async def prepare_data():
 
     _stop_ids = []
     stop_list = {}
-    if path.isfile(STOP_LIST):
+    if STOP_LIST.exists():
         with open(STOP_LIST, "r", encoding="UTF-8") as f:
             stop_list = json.load(f)
 
