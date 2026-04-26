@@ -9,7 +9,7 @@ import string
 import httpx
 from crawl_utils import emitRequest
 from pyproj import Transformer
-from utils import DATA_DIR
+from utils import DATA_DIR, query_igeocom_geojson
 
 res = []
 mtrStops = {}
@@ -40,6 +40,29 @@ def checkResult(results, q, stop, exit, barrierFree):
 
 async def main():
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
+
+    # exits[chinese station name][exit code]
+    exits = {}
+    igeocom_features = query_igeocom_geojson(class_code="TRS", type_code="MTA")
+
+    for feature in igeocom_features:
+        raw_chi_name = feature["properties"]["CHINESENAME"]
+        # general pattern 香港鐵路九龍站-D2進出口
+        # accept 港鐵xx站, e.g. 港鐵羅湖站-A出口
+        # ignore: with no exit code, e.g. 香港鐵路啟德站進出口
+        m = re.search(r"(?:香)?港鐵(?:路)?(\S+)站-([A-Z0-9]+)(?:進)?出口", raw_chi_name)
+        if not m:
+            continue
+        chi_name = m.group(1)
+        exit_code = m.group(2)
+        if chi_name not in exits:
+            exits[chi_name] = {}
+
+        if exit_code in exits[chi_name]:
+            raise ValueError(f"More than one {chi_name} station {exit_code} exit")
+
+        exits[chi_name][exit_code] = feature
+
     r = await emitRequest(
         "https://opendata.mtr.com.hk/data/mtr_lines_and_stations.csv", a_client
     )
