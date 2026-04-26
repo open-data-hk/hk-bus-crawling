@@ -13,7 +13,7 @@ from utils import DATA_DIR
 logger = logging.getLogger(__name__)
 
 # Raw list files
-RAW_ROUTE_CODE_LIST = DATA_DIR / ("gmb.raw.routeCodeList.json")
+RAW_ROUTE_NO_LIST = DATA_DIR / ("gmb.raw.routeNoList.json")
 RAW_ROUTE_LIST = DATA_DIR / ("gmb.raw.routeList.json")
 RAW_ROUTE_STOP_LIST = DATA_DIR / ("gmb.raw.routeStopList.json")
 RAW_STOP_LIST = DATA_DIR / ("gmb.raw.stopList.json")
@@ -41,10 +41,10 @@ def stop_url(stop_id):
 req_route_region_limit = asyncio.Semaphore(get_request_limit())
 
 
-async def get_routes_region(region: str, a_client) -> dict[str, Any]:
+async def get_routes_region(region: str, route_nos_by_region: dict, a_client) -> None:
     async with req_route_region_limit:
         r = await emitRequest(region_routes_url(region), a_client)
-        return r.json()["data"]
+        route_nos_by_region[region] = r.json()["data"]
 
 
 req_route_limit = asyncio.Semaphore(get_request_limit())
@@ -238,21 +238,27 @@ async def getRouteStop(co):
 
     REGIONS = ["HKI", "KLN", "NT"]
 
-    if RAW_ROUTE_CODE_LIST.exists():
-        logger.info(f"{RAW_ROUTE_CODE_LIST} already exists, loading...")
-        all_region_route_no = json.loads(RAW_ROUTE_CODE_LIST.read_text("utf-8"))
+    route_nos_by_region: dict[str, dict] = {}
+
+    if RAW_ROUTE_NO_LIST.exists():
+        logger.info(f"{RAW_ROUTE_NO_LIST} already exists, loading...")
+        route_nos_by_region = json.loads(RAW_ROUTE_NO_LIST.read_text("utf-8"))
     else:
-        all_region_routes = await asyncio.gather(
-            *[get_routes_region(r, a_client) for r in REGIONS]
+        await asyncio.gather(
+            *[
+                get_routes_region(region, route_nos_by_region, a_client)
+                for region in REGIONS
+            ]
         )
-        all_region_route_no = [
-            (region, route_no)
-            for region, region_route_no in zip(REGIONS, all_region_routes)
-            for route_no in region_route_no["routes"]
-        ]
-        RAW_ROUTE_CODE_LIST.write_text(
-            json.dumps(all_region_route_no, ensure_ascii=False), encoding="UTF-8"
+        RAW_ROUTE_NO_LIST.write_text(
+            json.dumps(route_nos_by_region, ensure_ascii=False), encoding="UTF-8"
         )
+
+    all_region_route_no = [
+        (region, route_no)
+        for region, region_data in route_nos_by_region.items()
+        for route_no in region_data["routes"]
+    ]
 
     all_route_no = [route_no for _, route_no in all_region_route_no]
 
@@ -280,8 +286,8 @@ async def getRouteStop(co):
         all_route_stops = {}
         all_route_directions = [
             (route["route_id"], direction["route_seq"])
-            for single_route_code_routes in all_routes
-            for route in single_route_code_routes
+            for single_route_no_routes in all_routes
+            for route in single_route_no_routes
             for direction in route["directions"]
         ]
         await asyncio.gather(
