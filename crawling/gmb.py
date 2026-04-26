@@ -58,6 +58,9 @@ async def get_route(region: str, route_no: str, all_routes: dict, a_client) -> N
         all_routes[key] = result
 
 
+req_route_stops_limit = asyncio.Semaphore(get_request_limit())
+
+
 async def get_route_stops(
     route_id: int, route_seq: int, all_route_stops: dict, a_client
 ) -> None:
@@ -65,11 +68,11 @@ async def get_route_stops(
     Provided route's `route_id` and `route_seq`, request route_stop
     and store result in `all_route_stops`
     """
-
-    r = await emitRequest(
-        route_stop_url(route_id, route_seq),
-        a_client,
-    )
+    async with req_route_stops_limit:
+        r = await emitRequest(
+            route_stop_url(route_id, route_seq),
+            a_client,
+        )
     result = r.json()["data"]
     key = f"{route_id}-{route_seq}"
     all_route_stops[key] = result
