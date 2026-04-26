@@ -77,7 +77,13 @@ async def main():
     r.encoding = "utf-8-sig"
     reader = csv.DictReader(r.text.strip().split("\n"))
     for entry in reader:
-        mtrStops[entry["Station ID"]] = {
+        station_id = entry["Station ID"]
+
+        # skip the last empty row
+        if not station_id:
+            continue
+
+        mtrStops[station_id] = {
             "name_tc": entry["Chinese Name"],
             "name_en": entry["English Name"],
             "barrierFreeExits": [],
