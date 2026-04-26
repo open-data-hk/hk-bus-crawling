@@ -12,32 +12,28 @@ from .utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
-COMPANY_CODE = "ctb"
-
 # Raw list files
 RAW_ROUTE_LIST = DATA_DIR / ("ctb.raw.routeList.json")
 RAW_ROUTE_STOP_LIST = DATA_DIR / ("ctb.raw.routeStopList.json")
 RAW_STOP_LIST = DATA_DIR / ("ctb.raw.stopList.json")
 
 # define output name
-ROUTE_LIST = DATA_DIR / ("routeList." + COMPANY_CODE + ".json")
-STOP_LIST = DATA_DIR / ("stopList." + COMPANY_CODE + ".json")
+ROUTE_LIST = DATA_DIR / "routeList.ctb.json"
+STOP_LIST = DATA_DIR / "stopList.ctb.json"
 
 BASE_URL = "https://rt.data.gov.hk/v2/transport/citybus"
 
 
-def routes_url(co: str = "ctb"):
-    return BASE_URL + "/route/" + co
+def routes_url():
+    return BASE_URL + "/route/ctb"
 
 
 def stop_url(stopId: str):
     return BASE_URL + "/stop/" + stopId
 
 
-def route_stop_url(
-    route: str, direction: Literal["inbound", "outbound"], co: str = "ctb"
-):
-    return BASE_URL + "/route-stop/" + co + "/" + route + "/" + direction
+def route_stop_url(route: str, direction: Literal["inbound", "outbound"]):
+    return BASE_URL + "/route-stop/ctb/" + route + "/" + direction
 
 
 req_route_stop_limit = asyncio.Semaphore(get_request_limit())
@@ -46,9 +42,9 @@ req_stop_list_limit = asyncio.Semaphore(get_request_limit())
 # methods of single API request
 
 
-async def get_route_list(co, a_client) -> list[dict]:
-    logger.info(f"Fetching route list of {COMPANY_CODE}")
-    r = await emitRequest(routes_url(co), a_client)
+async def get_route_list(a_client) -> list[dict]:
+    logger.info("Fetching route list of ctb")
+    r = await emitRequest(routes_url(), a_client)
     return r.json()["data"]
 
 
@@ -58,7 +54,7 @@ async def get_stop(stopId, a_client) -> dict:
     return r.json()["data"]
 
 
-async def get_route_stop(co: str, route: str, a_client) -> dict[str, list[dict]]:
+async def get_route_stop(route: str, a_client) -> dict[str, list[dict]]:
     # TODO: remove this commented code if found useless
     # if route.get("bound", 0) != 0 or route.get("stops", {}):
     #     return route
@@ -66,7 +62,7 @@ async def get_route_stop(co: str, route: str, a_client) -> dict[str, list[dict]]
     route_stops = {}
     for direction in ["inbound", "outbound"]:
         r = await emitRequest(
-            route_stop_url(route, direction, co),
+            route_stop_url(route, direction),
             a_client,
         )
         result = r.json()["data"]
@@ -80,17 +76,15 @@ async def get_route_stop(co: str, route: str, a_client) -> dict[str, list[dict]]
 
 
 async def get_stop_list(stops, a_client) -> list[dict]:
-    logger.info(f"Fetching stop list of {COMPANY_CODE}")
+    logger.info("Fetching stop list of ctb")
     ret = await asyncio.gather(*[get_stop(stop, a_client) for stop in stops])
     return ret
 
 
-async def get_route_stop_list(
-    co: str, route_list: list[dict], a_client
-) -> dict[str, list]:
-    logger.info(f"Fetching route stop list of {COMPANY_CODE}")
+async def get_route_stop_list(route_list: list[dict], a_client) -> dict[str, list]:
+    logger.info("Fetching route stop list of ctb")
     route_stop_list = await asyncio.gather(
-        *[get_route_stop(co, route["route"], a_client) for route in route_list]
+        *[get_route_stop(route["route"], a_client) for route in route_list]
     )
 
     route_stops = {}
@@ -101,7 +95,7 @@ async def get_route_stop_list(
     return route_stops
 
 
-async def getRouteStop(co):
+async def getRouteStop():
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
 
     # load route list and stop list if exist
@@ -116,7 +110,7 @@ async def getRouteStop(co):
         if raw_route_list_path.exists():
             route_list = json.loads(raw_route_list_path.read_text("utf-8"))
         else:
-            route_list = await get_route_list(co, a_client)
+            route_list = await get_route_list(a_client)
             raw_route_list_path.write_text(
                 json.dumps(route_list, ensure_ascii=False), encoding="UTF-8"
             )
@@ -131,12 +125,12 @@ async def getRouteStop(co):
     if raw_route_stop_list_path.exists():
         route_stop_list = json.loads(raw_route_stop_list_path.read_text("utf-8"))
     else:
-        route_stop_list = await get_route_stop_list(co, route_list, a_client)
+        route_stop_list = await get_route_stop_list(route_list, a_client)
         raw_route_stop_list_path.write_text(
             json.dumps(route_stop_list, ensure_ascii=False), encoding="UTF-8"
         )
 
-    logger.info(f"Preparing data of {COMPANY_CODE}")
+    logger.info("Preparing data of ctb")
 
     for route in route_list:
 
@@ -173,7 +167,7 @@ async def getRouteStop(co):
             if len(route["stops"][bound]) > 0:
                 _routeList.append(
                     {
-                        "co": co,
+                        "co": "ctb",
                         "route": route["route"],
                         "bound": "O" if bound == "outbound" else "I",
                         "orig_en": (
@@ -215,4 +209,4 @@ async def getRouteStop(co):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    asyncio.run(getRouteStop("ctb"))
+    asyncio.run(getRouteStop())
