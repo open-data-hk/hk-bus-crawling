@@ -14,3 +14,5 @@ gtfs-en
 route-ts
 
 .DS_Store
+
+.coverage
