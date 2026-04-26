@@ -67,6 +67,16 @@ async def get_route_stops(
     all_route_stops[key] = result
 
 
+req_stops_limit = asyncio.Semaphore(get_request_limit())
+
+
+async def get_stop(stop_id: int, stops_fetch: dict, a_client) -> None:
+    async with req_stops_limit:
+        r = await emitRequest(stop_url(stop_id), a_client)
+        result = r.json()["data"]
+        stops_fetch[stop_id] = result
+
+
 async def getRouteStop(co):
     if (DATA_DIR / f"routeList.{co}.json").exists() and (
         DATA_DIR / f"stopList.{co}.json"
@@ -270,30 +280,31 @@ async def getRouteStop(co):
         json.dump(routeList, f, ensure_ascii=False)
     logger.info("Route done")
 
-    req_stops_limit = asyncio.Semaphore(get_request_limit())
     with open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8") as f:
         gtfs = json.load(f)
         gtfsStops = gtfs["stopList"]
 
-    async def update_stop_loc(stop_id):
+    stops_fetch = {}
+    stop_ids_need_fetch = [
+        stop_id for stop_id in stops.keys() if stop_id not in gtfsStops
+    ]
+    await asyncio.gather(
+        *[get_stop(stop_id, stops_fetch, a_client) for stop_id in stop_ids_need_fetch]
+    )
+
+    # TODO: save stops_fetch as raw files
+
+    for stop_id, _ in stops.items():
         if stop_id not in gtfsStops:
-            logger.info(f"Getting stop {stop_id} from etagmb")
-            async with req_stops_limit:
-                r = await emitRequest(stop_url(stop_id), a_client)
-                stops[stop_id]["lat"] = r.json()["data"]["coordinates"]["wgs84"][
-                    "latitude"
-                ]
-                stops[stop_id]["long"] = r.json()["data"]["coordinates"]["wgs84"][
-                    "longitude"
-                ]
+            stops[stop_id]["lat"] = stops_fetch[stop_id]["coordinates"]["wgs84"][
+                "latitude"
+            ]
+            stops[stop_id]["long"] = stops_fetch[stop_id]["coordinates"]["wgs84"][
+                "longitude"
+            ]
         else:
-            logger.debug(f"Getting stop {stop_id} from gtfs")
             stops[stop_id]["lat"] = gtfsStops[stop_id]["lat"]
             stops[stop_id]["long"] = gtfsStops[stop_id]["lng"]
-
-    await asyncio.gather(
-        *[update_stop_loc(stop_id) for stop_id in sorted(stops.keys())]
-    )
 
     with open(DATA_DIR / f"stopList.{co}.json", "w", encoding="UTF-8") as f:
         json.dump(stops, f, ensure_ascii=False)
