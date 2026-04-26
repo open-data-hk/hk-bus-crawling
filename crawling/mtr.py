@@ -29,6 +29,10 @@ def filterStops(route):
 
 
 async def getRouteStop(co="mtr"):
+    if (DATA_DIR / f"routeList.{co}.json").exists() and (
+        DATA_DIR / f"stopList.{co}.json"
+    ).exists():
+        return
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
     epsgTransformer = Transformer.from_crs("epsg:2326", "epsg:4326")
 

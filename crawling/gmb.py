@@ -31,6 +31,10 @@ def stop_url(stop_id):
 
 
 async def getRouteStop(co):
+    if (DATA_DIR / f"routeList.{co}.json").exists() and (
+        DATA_DIR / f"stopList.{co}.json"
+    ).exists():
+        return
     a_client = httpx.AsyncClient()
     # parse gtfs service_id
     serviceIdMap = {}

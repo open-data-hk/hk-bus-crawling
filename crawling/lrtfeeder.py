@@ -22,6 +22,10 @@ def stops_url():
 
 
 async def getRouteStop(co="lrtfeeder"):
+    if (DATA_DIR / f"routeList.{co}.json").exists() and (
+        DATA_DIR / f"stopList.{co}.json"
+    ).exists():
+        return
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
     routeList = {}
     stopList = {}
