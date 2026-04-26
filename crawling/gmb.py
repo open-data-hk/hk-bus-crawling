@@ -4,12 +4,19 @@ import csv
 import json
 import logging
 import time
+from typing import Any
 
 import httpx
 from crawl_utils import emitRequest, get_request_limit
 from utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
+
+# Raw list files
+RAW_ROUTE_NO_LIST = DATA_DIR / ("gmb.raw.routeNoList.json")
+RAW_ROUTE_LIST = DATA_DIR / ("gmb.raw.routeList.json")
+RAW_ROUTE_STOP_LIST = DATA_DIR / ("gmb.raw.routeStopList.json")
+RAW_STOP_LIST = DATA_DIR / ("gmb.raw.stopList.json")
 
 BASE_URL = "https://data.etagmb.gov.hk"
 
@@ -28,6 +35,57 @@ def route_url(region: str, route_no: str):
 
 def stop_url(stop_id):
     return BASE_URL + "/stop/" + str(stop_id)
+
+
+# Single API request
+req_route_region_limit = asyncio.Semaphore(get_request_limit())
+
+
+async def get_routes_region(region: str, route_nos_by_region: dict, a_client) -> None:
+    async with req_route_region_limit:
+        r = await emitRequest(region_routes_url(region), a_client)
+        route_nos_by_region[region] = r.json()["data"]
+
+
+req_route_limit = asyncio.Semaphore(get_request_limit())
+
+
+async def get_route(region: str, route_no: str, all_routes: dict, a_client) -> None:
+    async with req_route_limit:
+        r = await emitRequest(route_url(region, route_no), a_client)
+        result = r.json()["data"]
+        key = f"{region}-{route_no}"
+        all_routes[key] = result
+
+
+req_route_stops_limit = asyncio.Semaphore(get_request_limit())
+
+
+async def get_route_stops(
+    route_id: int, route_seq: int, all_route_stops: dict, a_client
+) -> None:
+    """
+    Provided route's `route_id` and `route_seq`, request route_stop
+    and store result in `all_route_stops`
+    """
+    async with req_route_stops_limit:
+        r = await emitRequest(
+            route_stop_url(route_id, route_seq),
+            a_client,
+        )
+    result = r.json()["data"]
+    key = f"{route_id}-{route_seq}"
+    all_route_stops[key] = result
+
+
+req_stops_limit = asyncio.Semaphore(get_request_limit())
+
+
+async def get_stop(stop_id: int, stops_fetch: dict, a_client) -> None:
+    async with req_stops_limit:
+        r = await emitRequest(stop_url(stop_id), a_client)
+        result = r.json()["data"]
+        stops_fetch[stop_id] = result
 
 
 async def getRouteStop(co):
@@ -81,14 +139,12 @@ async def getRouteStop(co):
 
     stopCandidates = {}
 
-    async def get_route_directions(route, route_no):
+    def process_route_directions(route, route_no, all_route_stops):
         service_type = 2
         for direction in route["directions"]:
-            rs = await emitRequest(
-                route_stop_url(route["route_id"], direction["route_seq"]),
-                a_client,
-            )
-            for stop in rs.json()["data"]["route_stops"]:
+            key = f'{route["route_id"]}-{direction["route_seq"]}'
+            route_stops = all_route_stops[key]["route_stops"]
+            for stop in route_stops:
                 stop_id = stop["stop_id"]
 
                 # GMB ETA API Spec: "A stop may have different names under different routes"
@@ -177,10 +233,7 @@ async def getRouteStop(co):
                         if route["description_tc"].strip() == "正常班次"
                         else service_type
                     ),
-                    "stops": [
-                        str(stop["stop_id"])
-                        for stop in rs.json()["data"]["route_stops"]
-                    ],
+                    "stops": [str(stop["stop_id"]) for stop in route_stops],
                     "freq": getFreq(direction["headways"], serviceIdMap),
                 }
             )
@@ -188,55 +241,113 @@ async def getRouteStop(co):
             if route["description_tc"].strip() != "正常班次":
                 service_type += 1
 
-    req_route_limit = asyncio.Semaphore(get_request_limit())
+    REGIONS = ["HKI", "KLN", "NT"]
 
-    async def get_route(region: str, route_no):
-        async with req_route_limit:
-            r = await emitRequest(route_url(region, route_no), a_client)
-            await asyncio.gather(
-                *[get_route_directions(route, route_no) for route in r.json()["data"]]
-            )
-        routeList.sort(key=lambda a: a["gtfsId"])
+    route_nos_by_region: dict[str, dict] = {}
 
-    req_route_region_limit = asyncio.Semaphore(get_request_limit())
+    if RAW_ROUTE_NO_LIST.exists():
+        logger.info(f"{RAW_ROUTE_NO_LIST} already exists, loading...")
+        route_nos_by_region = json.loads(RAW_ROUTE_NO_LIST.read_text("utf-8"))
+    else:
+        await asyncio.gather(
+            *[
+                get_routes_region(region, route_nos_by_region, a_client)
+                for region in REGIONS
+            ]
+        )
+        RAW_ROUTE_NO_LIST.write_text(
+            json.dumps(route_nos_by_region, ensure_ascii=False), encoding="UTF-8"
+        )
 
-    async def get_routes_region(region: str):
-        async with req_route_region_limit:
-            r = await emitRequest(region_routes_url(region), a_client)
-            await asyncio.gather(
-                *[get_route(region, route) for route in r.json()["data"]["routes"]]
-            )
+    all_region_route_no = [
+        (region, route_no)
+        for region, region_data in route_nos_by_region.items()
+        for route_no in region_data["routes"]
+    ]
 
-    await asyncio.gather(*[get_routes_region(r) for r in ["HKI", "KLN", "NT"]])
+    # routes key by "{region}-{route_no}", e.g. KLN-82
+    all_routes: dict[str, list[dict]] = {}
+
+    if RAW_ROUTE_LIST.exists():
+        logger.info(f"{RAW_ROUTE_LIST} already exists, loading...")
+        all_routes = json.loads(RAW_ROUTE_LIST.read_text("utf-8"))
+    else:
+        await asyncio.gather(
+            *[
+                get_route(region, route, all_routes, a_client)
+                for region, route in all_region_route_no
+            ]
+        )
+        RAW_ROUTE_LIST.write_text(
+            json.dumps(all_routes, ensure_ascii=False), encoding="UTF-8"
+        )
+
+    # key: {route_id}-{route_seq}, e.g. 2006408-1
+    if RAW_ROUTE_STOP_LIST.exists():
+        logger.info(f"{RAW_ROUTE_STOP_LIST} already exists, loading...")
+        all_route_stops = json.loads(RAW_ROUTE_STOP_LIST.read_text("utf-8"))
+    else:
+        all_route_stops = {}
+        all_route_directions = [
+            (route["route_id"], direction["route_seq"])
+            for route_key, single_route_no_routes in all_routes.items()
+            for route in single_route_no_routes
+            for direction in route["directions"]
+        ]
+        await asyncio.gather(
+            *[
+                get_route_stops(route_id, route_seq, all_route_stops, a_client)
+                for route_id, route_seq in all_route_directions
+            ]
+        )
+        RAW_ROUTE_STOP_LIST.write_text(
+            json.dumps(all_route_stops, ensure_ascii=False), encoding="UTF-8"
+        )
+
+    for route_key, single_route_no_routes in all_routes.items():
+        region, route_no = route_key.split("-")
+        for route in single_route_no_routes:
+            process_route_directions(route, route_no, all_route_stops)
+
+    routeList.sort(key=lambda a: a["gtfsId"])
 
     with open(DATA_DIR / f"routeList.{co}.json", "w", encoding="UTF-8") as f:
         json.dump(routeList, f, ensure_ascii=False)
     logger.info("Route done")
 
-    req_stops_limit = asyncio.Semaphore(get_request_limit())
     with open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8") as f:
         gtfs = json.load(f)
         gtfsStops = gtfs["stopList"]
 
-    async def update_stop_loc(stop_id):
+    if RAW_STOP_LIST.exists():
+        logger.info(f"{RAW_STOP_LIST} already exists, loading...")
+        stops_fetch = json.loads(RAW_STOP_LIST.read_text("utf-8"))
+    else:
+        stops_fetch = {}
+        stop_ids_need_fetch = [
+            stop_id for stop_id in stops.keys() if stop_id not in gtfsStops
+        ]
+        await asyncio.gather(
+            *[
+                get_stop(stop_id, stops_fetch, a_client)
+                for stop_id in stop_ids_need_fetch
+            ]
+        )
+        RAW_STOP_LIST.write_text(
+            json.dumps(stops_fetch, ensure_ascii=False), encoding="UTF-8"
+        )
+
+    for stop_id, _ in stops.items():
         if stop_id not in gtfsStops:
-            logger.info(f"Getting stop {stop_id} from etagmb")
-            async with req_stops_limit:
-                r = await emitRequest(stop_url(stop_id), a_client)
-                stops[stop_id]["lat"] = r.json()["data"]["coordinates"]["wgs84"][
-                    "latitude"
-                ]
-                stops[stop_id]["long"] = r.json()["data"]["coordinates"]["wgs84"][
-                    "longitude"
-                ]
+            stops[stop_id]["lat"] = stops_fetch[stop_id]["coordinates"]["wgs84"][
+                "latitude"
+            ]
+            stops[stop_id]["long"] = stops_fetch[stop_id]["coordinates"]["wgs84"][
+                "longitude"
+            ]
         else:
-            logger.debug(f"Getting stop {stop_id} from gtfs")
             stops[stop_id]["lat"] = gtfsStops[stop_id]["lat"]
             stops[stop_id]["long"] = gtfsStops[stop_id]["lng"]
-
-    await asyncio.gather(
-        *[update_stop_loc(stop_id) for stop_id in sorted(stops.keys())]
-    )
 
     with open(DATA_DIR / f"stopList.{co}.json", "w", encoding="UTF-8") as f:
         json.dump(stops, f, ensure_ascii=False)
