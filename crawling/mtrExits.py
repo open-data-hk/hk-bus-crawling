@@ -72,6 +72,7 @@ async def main():
         mtrStops[entry["Station ID"]] = {
             "name_tc": entry["Chinese Name"],
             "name_en": entry["English Name"],
+            "barrierFreeExits": [],
         }
 
     r = await emitRequest(
@@ -83,7 +84,7 @@ async def main():
         if entry["Value"] == "Y" and entry["AJTextEn"] != "":
             for exit in re.findall(" [A-Z][\\d]*", entry["AJTextEn"]):
                 if entry["Station_No"] in mtrStops:
-                    mtrStops[entry["Station_No"]][exit.strip()] = True
+                    mtrStops[entry["Station_No"]]["barrierFreeExits"].append(exit)
 
     # crawl exit geolocation
     for key, stop in mtrStops.items():
