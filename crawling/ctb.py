@@ -11,6 +11,12 @@ from .utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
+COMPANY_CODE = "ctb"
+
+# define output name
+ROUTE_LIST = DATA_DIR / ("routeList." + COMPANY_CODE + ".json")
+STOP_LIST = DATA_DIR / ("stopList." + COMPANY_CODE + ".json")
+
 BASE_URL = "https://rt.data.gov.hk/v2/transport/citybus"
 
 
@@ -30,9 +36,6 @@ def route_stop_url(
 
 async def getRouteStop(co):
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
-    # define output name
-    ROUTE_LIST = DATA_DIR / ("routeList." + co + ".json")
-    STOP_LIST = DATA_DIR / ("stopList." + co + ".json")
 
     # load route list and stop list if exist
     routeList = {}
