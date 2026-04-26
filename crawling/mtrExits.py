@@ -81,8 +81,10 @@ async def main():
     r.encoding = "utf-8-sig"
     reader = csv.DictReader(r.text.strip().split("\n"))
     for entry in reader:
-        if entry["Value"] == "Y" and entry["AJTextEn"] != "":
-            for exit in re.findall(" [A-Z][\\d]*", entry["AJTextEn"]):
+        if entry["Value"] == "Y" and entry["AJTextZh"] != "":
+            # single uppercase character, optionally followed by a number
+            pattern = r"(?<![A-Za-z])([A-Z]\d*)(?![A-Za-z])"
+            for exit in re.findall(pattern, entry["AJTextZh"]):
                 if entry["Station_No"] in mtrStops:
                     mtrStops[entry["Station_No"]]["barrierFreeExits"].append(exit)
 
