@@ -95,7 +95,7 @@ async def get_route_stop_list(route_list: list[dict], a_client) -> dict[str, lis
     return route_stops
 
 
-async def getRouteStop():
+async def prepare_data():
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
 
     # load route list and stop list if exist
@@ -209,4 +209,4 @@ async def getRouteStop():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    asyncio.run(getRouteStop())
+    asyncio.run(prepare_data())
