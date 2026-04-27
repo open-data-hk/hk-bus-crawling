@@ -6,7 +6,7 @@ from pathlib import Path
 # orig/dest as {lang_key: name} with all languages, and stopName as
 # {co: {lang_key: name}}.
 LANG_SNAPSHOTS = [
-    ("tests/snapshots/gtfs-tc.json", "zh"),
+    ("tests/snapshots/gtfs-tc.json", "tc"),
     ("tests/snapshots/gtfs-en.json", "en"),
 ]
 

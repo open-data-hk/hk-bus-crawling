@@ -63,7 +63,7 @@ def importRouteListJson(co):
         if stopId not in stopList:
             try:
                 stopList[stopId] = {
-                    "name": {"en": stop["name_en"], "zh": stop["name_tc"]},
+                    "name": {"en": stop["name_en"], "tc": stop["name_tc"]},
                     "location": {"lat": float(stop["lat"]), "lng": float(stop["long"])},
                 }
             except BaseException:
@@ -74,11 +74,11 @@ def importRouteListJson(co):
         speicalType = 1
         orig = {
             "en": _route["orig_en"].replace("/", "／"),
-            "zh": _route["orig_tc"].replace("/", "／"),
+            "tc": _route["orig_tc"].replace("/", "／"),
         }
         dest = {
             "en": _route["dest_en"].replace("/", "／"),
-            "zh": _route["dest_tc"].replace("/", "／"),
+            "tc": _route["dest_tc"].replace("/", "／"),
         }
 
         for route in routeList:

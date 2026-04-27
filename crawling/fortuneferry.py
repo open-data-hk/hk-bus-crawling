@@ -34,16 +34,16 @@ def main():
         for route_id, gtfsRoute in gtfsRoutes.items():
             if "ferry" in gtfsRoute["co"]:
                 if (
-                    orig.lower() == gtfsRoute["orig"]["zh"].lower()
-                    and dest.lower() == gtfsRoute["dest"]["zh"].lower()
+                    orig.lower() == gtfsRoute["orig"]["tc"].lower()
+                    and dest.lower() == gtfsRoute["dest"]["tc"].lower()
                 ):
                     routeList.append(
                         {
                             "gtfsId": route_id,
                             "route": route_code,
-                            "orig_tc": gtfsRoute["orig"]["zh"],
+                            "orig_tc": gtfsRoute["orig"]["tc"],
                             "orig_en": gtfsEn["routeList"][route_id]["orig"]["en"],
-                            "dest_tc": gtfsRoute["dest"]["zh"],
+                            "dest_tc": gtfsRoute["dest"]["tc"],
                             "dest_en": gtfsEn["routeList"][route_id]["dest"]["en"],
                             "service_type": 1,
                             "bound": "O",
@@ -56,9 +56,9 @@ def main():
                             {
                                 "gtfsId": route_id,
                                 "route": route_code,
-                                "dest_tc": gtfsRoute["orig"]["zh"],
+                                "dest_tc": gtfsRoute["orig"]["tc"],
                                 "dest_en": gtfsEn["routeList"][route_id]["orig"]["en"],
-                                "orig_tc": gtfsRoute["dest"]["zh"],
+                                "orig_tc": gtfsRoute["dest"]["tc"],
                                 "orig_en": gtfsEn["routeList"][route_id]["dest"]["en"],
                                 "service_type": 1,
                                 "bound": "I",

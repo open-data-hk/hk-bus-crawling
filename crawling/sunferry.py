@@ -52,9 +52,9 @@ def main():
                         {
                             "gtfsId": route_id,
                             "route": route_code,
-                            "orig_tc": gtfsZh["routeList"][route_id]["orig"]["zh"],
+                            "orig_tc": gtfsZh["routeList"][route_id]["orig"]["tc"],
                             "orig_en": gtfsRoute["orig"]["en"],
-                            "dest_tc": gtfsZh["routeList"][route_id]["dest"]["zh"],
+                            "dest_tc": gtfsZh["routeList"][route_id]["dest"]["tc"],
                             "dest_en": gtfsRoute["dest"]["en"],
                             "service_type": 1,
                             "bound": "O",
@@ -70,9 +70,9 @@ def main():
                         {
                             "gtfsId": route_id,
                             "route": route_code,
-                            "dest_tc": gtfsZh["routeList"][route_id]["orig"]["zh"],
+                            "dest_tc": gtfsZh["routeList"][route_id]["orig"]["tc"],
                             "dest_en": gtfsRoute["orig"]["en"],
-                            "orig_tc": gtfsZh["routeList"][route_id]["dest"]["zh"],
+                            "orig_tc": gtfsZh["routeList"][route_id]["dest"]["tc"],
                             "orig_en": gtfsRoute["dest"]["en"],
                             "service_type": 1,
                             "bound": "I",

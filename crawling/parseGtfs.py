@@ -19,8 +19,7 @@ LANG_CONFIG = {
         "zip": "gtfs-tc.zip",
         "dir": "gtfs-tc",
         "version_key": "GTFS-TC",
-        # TODO: change to "tc"
-        "lang_key": "zh",
+        "lang_key": "tc",
     },
     "en": {
         "url": "https://static.data.gov.hk/td/pt-headway-en/gtfs.zip",
@@ -56,7 +55,7 @@ def orig_dest(
 
     if lang == "tc":
         # TODO: tc version should not contains English?
-        return {"zh": orig}, {"zh": dest}
+        return {"tc": orig}, {"tc": dest}
     elif lang == "sc":
         return {"sc": orig}, {"sc": dest}
     elif lang == "en":

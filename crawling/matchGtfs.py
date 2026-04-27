@@ -150,7 +150,7 @@ def matchRoutes(co):
     routeCandidates = []
     # one pass to find matches of co vs gtfs by DP
     for gtfsId, gtfsRoute in gtfsRoutes.items():
-        debug = False and gtfsId == "1047" and gtfsRoute["orig"]["zh"] == "沙田站"
+        debug = False and gtfsId == "1047" and gtfsRoute["orig"]["tc"] == "沙田站"
         if co == "gmb" and co in gtfsRoute["co"]:  # handle for gmb
             for route in routeList:
                 if route["gtfsId"] == gtfsId:
@@ -178,12 +178,12 @@ def matchRoutes(co):
                         co == "hkkf"
                         and (
                             (
-                                route["orig_tc"].startswith(gtfsRoute["orig"]["zh"])
-                                and route["dest_tc"].startswith(gtfsRoute["dest"]["zh"])
+                                route["orig_tc"].startswith(gtfsRoute["orig"]["tc"])
+                                and route["dest_tc"].startswith(gtfsRoute["dest"]["tc"])
                             )
                             or (
-                                route["orig_tc"].startswith(gtfsRoute["dest"]["zh"])
-                                and route["dest_tc"].startswith(gtfsRoute["orig"]["zh"])
+                                route["orig_tc"].startswith(gtfsRoute["dest"]["tc"])
+                                and route["dest_tc"].startswith(gtfsRoute["orig"]["tc"])
                             )
                         )
                     ):
