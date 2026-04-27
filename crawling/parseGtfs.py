@@ -132,13 +132,8 @@ async def parseGtfs():
             for row in csv.DictReader(csvfile):
                 route_id = row["route_id"]
                 orig_l, dest_l = orig_dest(row["route_long_name"], lang)
-                # TODO: cleaner update?
-                routeList[route_id]["orig"].update(
-                    {k: v for k, v in orig_l.items() if v}
-                )
-                routeList[route_id]["dest"].update(
-                    {k: v for k, v in dest_l.items() if v}
-                )
+                routeList[route_id]["orig"].update(orig_l)
+                routeList[route_id]["dest"].update(dest_l)
 
     # parse timetable
     with open(primary_dir / "trips.txt", "r", encoding="UTF-8") as f:
