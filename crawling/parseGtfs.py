@@ -210,14 +210,29 @@ async def parseGtfs():
                     logger.warning(
                         f"Unable to parseStopName, name: {name}, stop_id: {stop_id}"
                     )
-            for co, gtfsName in matches:
-                # e.g. [KMB+CTB] 油麻地碧街/<BR>碧街, 弥敦道
-                # kmb: 油麻地碧街, ctb: 碧街, 弥敦道
-                companies = co.split("+")
-                stop_names = gtfsName.split("/<BR>")
-                for co_code, stop_name in zip(companies, stop_names):
-                    co_code = co_code.lower().replace("lwb", "kmb")
-                    ret[co_code] = stop_name
+            else:
+                for co, gtfsName in matches:
+                    # e.g. [KMB+CTB] 油麻地碧街/<BR>碧街, 弥敦道
+                    # kmb: 油麻地碧街, ctb: 碧街, 弥敦道
+                    companies = co.split("+")
+                    stop_names = gtfsName.split("/<BR>")
+
+                    if len(companies) != len(stop_names):
+                        # e.g. KMB+CTB 頌雅路 -> share the same name
+                        if len(stop_names) == 1:
+                            stop_names = stop_names * len(companies)
+                        # e.g. KMB 跑馬地馬場/<BR>跑馬地馬場, 摩理臣山道 -> pick the first name
+                        elif len(companies) == 1:
+                            stop_names = stop_names[:1]
+                        else:
+                            logger.warning(
+                                f"Unable to parseStopName, co: {co}, name: {gtfsName}"
+                            )
+
+                    for co_code, stop_name in zip(companies, stop_names, strict=True):
+                        co_code = co_code.lower().replace("lwb", "kmb")
+                        ret[co_code] = stop_name
+
         return ret
 
     # Initialize stopList with coords from primary lang
