@@ -51,9 +51,7 @@ async def getRouteStop(co):
         apiStops.append(stop)
 
     with open(DATA_DIR / "gtfs.json", "r", encoding="utf-8") as f:
-        gtfsZh = json.load(f)
-
-    with open(DATA_DIR / "gtfs-en.json", "r", encoding="utf-8") as f:
+        # TODO: remove gtfs if it is unused
         gtfs = json.load(f)
         gtfsRoutes = gtfs["routeList"]
         gtfsStops = gtfs["stopList"]
