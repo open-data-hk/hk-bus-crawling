@@ -302,7 +302,6 @@ async def parseGtfs():
                     "serviceDayMap": serviceDayMap,
                 },
                 ensure_ascii=False,
-                indent=2,
             )
         )
 
