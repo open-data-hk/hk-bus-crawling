@@ -256,12 +256,12 @@ def merge_stop_list():
     )
 
     with open(DATA_DIR / "stopMap.json", "w", encoding="UTF-8") as f:
-        json.dump(stop_map, f, indent=4)
+        json.dump(stop_map, f)
 
     db["stopMap"] = stop_map
 
     with open(DATA_DIR / "routeFareList.json", "w", encoding="UTF-8") as f:
-        json.dump(db, f, indent=4)
+        json.dump(db, f)
 
     # reduce size of routeFareList.min.json by rounding lat/lng values to 5 decimal places
     # 5 d.p. is roughly one-metre accuracy, it is good enough for this project
@@ -281,7 +281,7 @@ def merge_stop_list():
     )
 
     with open(DATA_DIR / "routeFareList.alpha.json", "w", encoding="UTF-8") as f:
-        json.dump(db, f, indent=4)
+        json.dump(db, f)
 
     with open(DATA_DIR / "routeFareList.min.json", "w", encoding="UTF-8") as f:
         json.dump(db, f)

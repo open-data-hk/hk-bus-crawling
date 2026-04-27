@@ -309,4 +309,4 @@ routeFareList = {}
 
 
 with open(DATA_DIR / "routeGtfs.all.json", "w", encoding="UTF-8") as f:
-    f.write(json.dumps(gtfsRoutes, ensure_ascii=False, indent=4))
+    f.write(json.dumps(gtfsRoutes, ensure_ascii=False))

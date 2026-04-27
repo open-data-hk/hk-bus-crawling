@@ -55,4 +55,4 @@ def store_version(key: str, version: str):
     version_dict[key] = version
     version_dict = dict(sorted(version_dict.items()))
     with open(DATA_DIR / "0versions.json", "w", encoding="UTF-8") as f:
-        json.dump(version_dict, f, indent=4)
+        json.dump(version_dict, f)

@@ -232,7 +232,7 @@ db = standardizeDict(
 )
 
 with open(DATA_DIR / "routeFareList.mergeRoutes.json", "w", encoding="UTF-8") as f:
-    f.write(json.dumps(db, ensure_ascii=False, indent=4))
+    f.write(json.dumps(db, ensure_ascii=False))
 
 with open(DATA_DIR / "routeFareList.mergeRoutes.min.json", "w", encoding="UTF-8") as f:
     f.write(json.dumps(db, ensure_ascii=False, separators=(",", ":")))
