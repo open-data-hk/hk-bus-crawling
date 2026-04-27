@@ -19,6 +19,11 @@ jobs:
 
     env:
       ALPHA_BRANCH_NAME: alpha
+      AWS_ENDPOINT_URL: ${{ secrets.AWS_ENDPOINT_URL }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
     steps:
       - name: Check out repository code
         uses: actions/checkout@v6
@@ -61,15 +66,13 @@ jobs:
       - name: Install dependencies
         run: poetry install
 
-      - name: Download GMB raw data from previous run
-        uses: dawidd6/action-download-artifact@v20
+      - name: Download GMB raw data from S3
         continue-on-error: true
-        with:
-          name: gmb-raw-data
-          path: data/
-          workflow: fetch-data.yml
-          workflow_conclusion: success
-          branch: master
+        run: |
+          aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeNoList.json data/ || true
+          aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeList.json data/ || true
+          aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeStopList.json data/ || true
+          aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.stopList.json data/ || true
 
       - name: Crawling resources
         shell: bash
@@ -103,16 +106,12 @@ jobs:
           md5sum data/routeFareList.min.json | cut -f1 -d ' ' | tr -d $'\n' > data/routeFareList.md5
           md5sum data/routeFareList.alpha.min.json | cut -f1 -d ' ' | tr -d $'\n' > data/routeFareList.alpha.md5
 
-      - name: Archive GMB raw data
-        uses: actions/upload-artifact@v7
-        with:
-          name: gmb-raw-data
-          retention-days: 14
-          path: |
-            data/gmb.raw.routeNoList.json
-            data/gmb.raw.routeList.json
-            data/gmb.raw.routeStopList.json
-            data/gmb.raw.stopList.json
+      - name: Upload GMB raw data to S3
+        run: |
+          aws s3 cp data/gmb.raw.routeNoList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeNoList.json
+          aws s3 cp data/gmb.raw.routeList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeList.json
+          aws s3 cp data/gmb.raw.routeStopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeStopList.json
+          aws s3 cp data/gmb.raw.stopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.stopList.json
 
       - name: Archive crawling outputs
         uses: actions/upload-artifact@v7
