@@ -9,8 +9,9 @@ python ./crawling/lrtfeeder.py
 python ./crawling/lightRail.py
 python ./crawling/mtr.py
 python ./crawling/parseJourneyTime.py
-python ./crawling/parseGtfs.py
-python ./crawling/parseGtfsEn.py
+python ./crawling/parseGtfs.py tc
+python ./crawling/parseGtfs.py en
+python ./crawling/parseGtfs.py sc
 python ./crawling/sunferry.py
 python ./crawling/fortuneferry.py
 python ./crawling/hkkf.py
