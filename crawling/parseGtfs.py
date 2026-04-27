@@ -196,10 +196,13 @@ async def parseGtfs():
             if len(matches) == 0:
                 return {"unknown": stop_name_raw}
             for co, gtfsName in matches:
-                # TODO: improve code clarity
-                x, y = co.split("+"), gtfsName.split("/<BR>")
-                for i in range(len(x)):
-                    ret[x[i].lower().replace("lwb", "kmb")] = y[i if i < len(y) else 0]
+                # e.g. [KMB+CTB] 油麻地碧街/<BR>碧街, 弥敦道
+                # kmb: 油麻地碧街, ctb: 碧街, 弥敦道
+                companies = co.split("+")
+                stop_names = gtfsName.split("/<BR>")
+                for co_code, stop_name in zip(companies, stop_names):
+                    co_code = co_code.lower().replace("lwb", "kmb")
+                    ret[co_code] = stop_name
         return ret
 
     # Initialize stopList with coords from primary lang
