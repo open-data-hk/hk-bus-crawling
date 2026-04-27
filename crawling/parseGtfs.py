@@ -119,11 +119,7 @@ async def parseGtfs():
                 "freq": {},
                 "orig": {},
                 "dest": {},
-                "jt": (
-                    routeJourneyTime[route_id]["journeyTime"]
-                    if route_id in routeJourneyTime
-                    else None
-                ),
+                "jt": routeJourneyTime[route_id],
             }
 
     # Merge route names from each lang

@@ -33,14 +33,16 @@ async def parseJourneyTime():
         version = datetime.fromisoformat(root.attrib["generated"] + "+08:00")
         store_version(f"routes-fares-xml/{name}", version.isoformat())
         for route in root.iter("ROUTE"):
-            routeTimeList[route.find("ROUTE_ID").text] = {
-                "co": route.find("COMPANY_CODE")
-                .text.replace("LWB", "KMB")
-                .lower()
-                .split("+"),
-                "route": route.find("ROUTE_NAMEC").text,
-                "journeyTime": route.find("JOURNEY_TIME").text,
-            }
+            routeTimeList[route.find("ROUTE_ID").text] = route.find("JOURNEY_TIME").text
+            # Was dict below before, found only jt is used in parseGtfs.py
+            # {
+            #     "co": route.find("COMPANY_CODE")
+            #     .text.replace("LWB", "KMB")
+            #     .lower()
+            #     .split("+"),
+            #     "route": route.find("ROUTE_NAMEC").text,
+            #     "journeyTime": route.find("JOURNEY_TIME").text,
+            # }
 
     with open(DATA_DIR / "routeTime.json", "w", encoding="UTF-8") as f:
         f.write(json.dumps(routeTimeList, ensure_ascii=False))
