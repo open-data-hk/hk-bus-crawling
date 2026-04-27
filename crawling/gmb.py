@@ -448,33 +448,35 @@ async def getRouteStop(co):
         gtfs = json.load(f)
         gtfsStops = gtfs["stopList"]
 
+    # this block only has context of API
+    # ignore any other requirements, e.g. gtfsStops
+
+    # must fetch in any case
+    remote_record = await get_last_update("stop", a_client)
+
     if RAW_STOP_LIST.exists():
         logger.info(f"{RAW_STOP_LIST} already exists, loading...")
-        stops_fetch = json.loads(RAW_STOP_LIST.read_text("utf-8"))
+        all_stops = json.loads(RAW_STOP_LIST.read_text("utf-8"))
 
         local_last_update = {
-            stop_id: stop["data_timestamp"] for stop_id, stop in stops_fetch.items()
+            stop_id: stop["data_timestamp"] for stop_id, stop in all_stops.items()
         }
 
-        remote_record = await get_last_update("stop", a_client)
         remote_last_update = {
             str(entry["stop_id"]): entry["last_update_date"] for entry in remote_record
         }
 
         local_keys = set(local_last_update.keys())
         remote_keys = set(remote_last_update.keys())
-        # TODO: fetch all stops from API and save as collection?
-        needed_stop_ids = {
-            stop_id for stop_id in stops.keys() if stop_id not in gtfsStops
-        }
 
         delete_keys = local_keys - remote_keys
-        fetch_keys = needed_stop_ids - local_keys
+        fetch_keys = remote_keys - local_keys
 
         for stop_id in delete_keys:
-            del stops_fetch[stop_id]
+            del all_stops[stop_id]
 
-        for stop_id in needed_stop_ids & local_keys & remote_keys:
+        for stop_id in local_keys & remote_keys:
+            # for stop_id in gtfsStops_missing_stop_ids & local_keys & remote_keys:
             local_ts = datetime.datetime.fromisoformat(local_last_update[stop_id])
             remote_ts = datetime.datetime.fromisoformat(
                 remote_last_update[stop_id]
@@ -485,30 +487,41 @@ async def getRouteStop(co):
         if fetch_keys:
             logger.info(f"Fetching stops of ids: {fetch_keys}")
             await asyncio.gather(
-                *[get_stop(stop_id, stops_fetch, a_client) for stop_id in fetch_keys]
+                *[get_stop(stop_id, all_stops, a_client) for stop_id in fetch_keys]
             )
 
     else:
-        stops_fetch = {}
-        stop_ids_need_fetch = [
-            stop_id for stop_id in stops.keys() if stop_id not in gtfsStops
-        ]
+        all_stops = {}
+        await asyncio.gather(
+            *[get_stop(stop["stop_id"], all_stops, a_client) for stop in remote_record]
+        )
+    RAW_STOP_LIST.write_text(
+        json.dumps(all_stops, ensure_ascii=False), encoding="UTF-8"
+    )
+
+    stop_ids_need_fetch = set()
+    for stop_id in stops.keys():
+        if (stop_id not in gtfsStops) and (stop_id not in all_stops):
+            stop_ids_need_fetch.add(stop_id)
+
+    additional_stops_fetch = {}
+    if stop_ids_need_fetch:
+        logger.info(f"Fetching missing stop ids: {stop_ids_need_fetch}")
         await asyncio.gather(
             *[
-                get_stop(stop_id, stops_fetch, a_client)
+                get_stop(stop_id, additional_stops_fetch, a_client)
                 for stop_id in stop_ids_need_fetch
             ]
         )
-    RAW_STOP_LIST.write_text(
-        json.dumps(stops_fetch, ensure_ascii=False), encoding="UTF-8"
-    )
+
+    all_stops = {**all_stops, **additional_stops_fetch}
 
     for stop_id, _ in stops.items():
         if stop_id not in gtfsStops:
-            stops[stop_id]["lat"] = stops_fetch[stop_id]["coordinates"]["wgs84"][
+            stops[stop_id]["lat"] = all_stops[stop_id]["coordinates"]["wgs84"][
                 "latitude"
             ]
-            stops[stop_id]["long"] = stops_fetch[stop_id]["coordinates"]["wgs84"][
+            stops[stop_id]["long"] = all_stops[stop_id]["coordinates"]["wgs84"][
                 "longitude"
             ]
         else:
