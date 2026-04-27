@@ -9,7 +9,6 @@ python ./crawling/lightRail.py pause
 python ./crawling/mtr.py pause
 python ./crawling/parseJourneyTime.py pause
 python ./crawling/parseGtfs.py pause
-python ./crawling/parseGtfsEn.py pause
 python ./crawling/sunferry.py pause
 python ./crawling/fortuneferry.py pause
 python ./crawling/hkkf.py pause

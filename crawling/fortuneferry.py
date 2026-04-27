@@ -16,9 +16,6 @@ def main():
         gtfsRoutes = gtfs["routeList"]
         gtfsStops = gtfs["stopList"]
 
-    with open(DATA_DIR / "gtfs-en.json", "r", encoding="UTF-8") as f:
-        gtfsEn = json.load(f)
-
     routes = {
         "7059": ["中環", "紅磡"],
         "7021": ["北角", "啟德"],
@@ -34,17 +31,17 @@ def main():
         for route_id, gtfsRoute in gtfsRoutes.items():
             if "ferry" in gtfsRoute["co"]:
                 if (
-                    orig.lower() == gtfsRoute["orig"]["zh"].lower()
-                    and dest.lower() == gtfsRoute["dest"]["zh"].lower()
+                    orig.lower() == gtfsRoute["orig"]["tc"].lower()
+                    and dest.lower() == gtfsRoute["dest"]["tc"].lower()
                 ):
                     routeList.append(
                         {
                             "gtfsId": route_id,
                             "route": route_code,
-                            "orig_tc": gtfsRoute["orig"]["zh"],
-                            "orig_en": gtfsEn["routeList"][route_id]["orig"]["en"],
-                            "dest_tc": gtfsRoute["dest"]["zh"],
-                            "dest_en": gtfsEn["routeList"][route_id]["dest"]["en"],
+                            "orig_tc": gtfsRoute["orig"]["tc"],
+                            "orig_en": gtfsRoute["orig"]["en"],
+                            "dest_tc": gtfsRoute["dest"]["tc"],
+                            "dest_en": gtfsRoute["dest"]["en"],
                             "service_type": 1,
                             "bound": "O",
                             "stops": gtfsRoute["stops"]["1"],
@@ -56,10 +53,10 @@ def main():
                             {
                                 "gtfsId": route_id,
                                 "route": route_code,
-                                "dest_tc": gtfsRoute["orig"]["zh"],
-                                "dest_en": gtfsEn["routeList"][route_id]["orig"]["en"],
-                                "orig_tc": gtfsRoute["dest"]["zh"],
-                                "orig_en": gtfsEn["routeList"][route_id]["dest"]["en"],
+                                "dest_tc": gtfsRoute["orig"]["tc"],
+                                "dest_en": gtfsRoute["orig"]["en"],
+                                "orig_tc": gtfsRoute["dest"]["tc"],
+                                "orig_en": gtfsRoute["dest"]["en"],
                                 "service_type": 1,
                                 "bound": "I",
                                 "stops": (
@@ -79,8 +76,8 @@ def main():
         for stopId in route["stops"]:
             stopList[stopId] = {
                 "stop": stopId,
-                "name_en": gtfsEn["stopList"][stopId]["stopName"]["unknown"],
-                "name_tc": gtfsStops[stopId]["stopName"]["unknown"],
+                "name_en": gtfsStops[stopId]["stopName"]["ferry"]["en"],
+                "name_tc": gtfsStops[stopId]["stopName"]["ferry"]["tc"],
                 "lat": gtfsStops[stopId]["lat"],
                 "long": gtfsStops[stopId]["lng"],
             }

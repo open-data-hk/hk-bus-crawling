@@ -22,7 +22,7 @@ Scripts must run in layer order. Within each layer, scripts are independent and 
 
 | Script | Reads | Output files |
 |--------|-------|-------------|
-| `parseGtfs.py` | `routeTime.json` | `gtfs.zip`, `gtfs/` (extracted), `gtfs.json` |
+| `parseGtfs.py` | `routeTime.json` | `gtfs.zip`, `gtfs-tc/` (extracted), `gtfs.json` |
 | `parseGtfsEn.py` | `routeTime.json` | `gtfs-en.zip`, `gtfs-en/` (extracted), `gtfs-en.json` |
 
 These two can run in parallel with each other.
@@ -31,7 +31,7 @@ These two can run in parallel with each other.
 
 | Script | Reads | Output files |
 |--------|-------|-------------|
-| `gmb.py` | `gtfs/calendar.txt`, `gtfs.json` | `routeList.gmb.json`, `stopList.gmb.json` |
+| `gmb.py` | `gtfs-tc/calendar.txt`, `gtfs.json` | `routeList.gmb.json`, `stopList.gmb.json` |
 | `sunferry.py` | `gtfs.json`, `gtfs-en.json` | `routeList.sunferry.json`, `stopList.sunferry.json` |
 | `fortuneferry.py` | `gtfs.json`, `gtfs-en.json` | `routeList.fortuneferry.json`, `stopList.fortuneferry.json` |
 | `hkkf.py` | `gtfs.json`, `gtfs-en.json` | `routeList.hkkf.json`, `stopList.hkkf.json` |
@@ -72,7 +72,7 @@ All four can run in parallel once Layer 2 completes.
 
 ## Key notes
 
-- **`gmb.py` is not independent** despite looking like the other operator scripts. It reads `gtfs/calendar.txt` (produced by `parseGtfs.py`), making it a Layer 3 script.
+- **`gmb.py` is not independent** despite looking like the other operator scripts. It reads `gtfs-tc/calendar.txt` (produced by `parseGtfs.py`), making it a Layer 3 script.
 - **`sunferry.py`, `fortuneferry.py`, `hkkf.py`** require *both* `gtfs.json` and `gtfs-en.json`, so they must wait for both `parseGtfs.py` and `parseGtfsEn.py`.
 - **`mergeRoutes.py`** has a cross-layer dependency on `holiday.json` from Layer 1, so `parseHoliday.py` must complete before Layer 6.
 - **`mtrExits.py`** is fully independent and can run at any time — nothing downstream consumes its output.

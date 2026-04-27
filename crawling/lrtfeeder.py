@@ -43,15 +43,15 @@ async def getRouteStop(co="lrtfeeder"):
             if len(referenceId.split("-")) == 1
             else ((int)(referenceId.split("-")[1]) + 1)
         )
-        start = {"zh": chn.split("至")[0], "en": eng.split(" to ")[0]}
-        end = {"zh": chn.split("至")[1], "en": eng.split(" to ")[1]}
+        start = {"tc": chn.split("至")[0], "en": eng.split(" to ")[0]}
+        end = {"tc": chn.split("至")[1], "en": eng.split(" to ")[1]}
         for bound in ["I", "O"]:
             routeList[referenceId + "_" + bound] = {
                 "route": route,
                 "bound": bound,
                 "service_type": serviceType,
-                "orig_tc": start["zh"] if bound == "O" else end["zh"],
-                "dest_tc": end["zh"] if bound == "O" else start["zh"],
+                "orig_tc": start["tc"] if bound == "O" else end["tc"],
+                "dest_tc": end["tc"] if bound == "O" else start["tc"],
                 "orig_en": start["en"] if bound == "O" else end["en"],
                 "dest_en": end["en"] if bound == "O" else start["en"],
                 "stops": [],

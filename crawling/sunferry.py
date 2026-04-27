@@ -12,9 +12,6 @@ def main():
         return
 
     with open(DATA_DIR / "gtfs.json", "r", encoding="utf-8") as f:
-        gtfsZh = json.load(f)
-
-    with open(DATA_DIR / "gtfs-en.json", "r", encoding="utf-8") as f:
         gtfs = json.load(f)
         gtfsRoutes = gtfs["routeList"]
         gtfsStops = gtfs["stopList"]
@@ -52,9 +49,9 @@ def main():
                         {
                             "gtfsId": route_id,
                             "route": route_code,
-                            "orig_tc": gtfsZh["routeList"][route_id]["orig"]["zh"],
+                            "orig_tc": gtfsRoute["orig"]["tc"],
                             "orig_en": gtfsRoute["orig"]["en"],
-                            "dest_tc": gtfsZh["routeList"][route_id]["dest"]["zh"],
+                            "dest_tc": gtfsRoute["dest"]["tc"],
                             "dest_en": gtfsRoute["dest"]["en"],
                             "service_type": 1,
                             "bound": "O",
@@ -70,9 +67,9 @@ def main():
                         {
                             "gtfsId": route_id,
                             "route": route_code,
-                            "dest_tc": gtfsZh["routeList"][route_id]["orig"]["zh"],
+                            "dest_tc": gtfsRoute["orig"]["tc"],
                             "dest_en": gtfsRoute["orig"]["en"],
-                            "orig_tc": gtfsZh["routeList"][route_id]["dest"]["zh"],
+                            "orig_tc": gtfsRoute["dest"]["tc"],
                             "orig_en": gtfsRoute["dest"]["en"],
                             "service_type": 1,
                             "bound": "I",
@@ -93,8 +90,8 @@ def main():
         for stopId in route["stops"]:
             stopList[stopId] = {
                 "stop": stopId,
-                "name_en": gtfsStops[stopId]["stopName"]["unknown"],
-                "name_tc": gtfsZh["stopList"][stopId]["stopName"]["unknown"],
+                "name_en": gtfsStops[stopId]["stopName"]["ferry"]["en"],
+                "name_tc": gtfsStops[stopId]["stopName"]["ferry"]["tc"],
                 "lat": gtfsStops[stopId]["lat"],
                 "long": gtfsStops[stopId]["lng"],
             }
