@@ -451,6 +451,43 @@ async def getRouteStop(co):
     if RAW_STOP_LIST.exists():
         logger.info(f"{RAW_STOP_LIST} already exists, loading...")
         stops_fetch = json.loads(RAW_STOP_LIST.read_text("utf-8"))
+
+        local_last_update = {
+            stop_id: stop["data_timestamp"] for stop_id, stop in stops_fetch.items()
+        }
+
+        remote_record = await get_last_update("stop", a_client)
+        remote_last_update = {
+            str(entry["stop_id"]): entry["last_update_date"] for entry in remote_record
+        }
+
+        local_keys = set(local_last_update.keys())
+        remote_keys = set(remote_last_update.keys())
+        # TODO: fetch all stops from API and save as collection?
+        needed_stop_ids = {
+            stop_id for stop_id in stops.keys() if stop_id not in gtfsStops
+        }
+
+        delete_keys = local_keys - remote_keys
+        fetch_keys = needed_stop_ids - local_keys
+
+        for stop_id in delete_keys:
+            del stops_fetch[stop_id]
+
+        for stop_id in needed_stop_ids & local_keys & remote_keys:
+            local_ts = datetime.datetime.fromisoformat(local_last_update[stop_id])
+            remote_ts = datetime.datetime.fromisoformat(
+                remote_last_update[stop_id]
+            ).replace(tzinfo=ZoneInfo("Asia/Hong_Kong"))
+            if remote_ts > local_ts:
+                fetch_keys.add(stop_id)
+
+        if fetch_keys:
+            logger.info(f"Fetching stops of ids: {fetch_keys}")
+            await asyncio.gather(
+                *[get_stop(stop_id, stops_fetch, a_client) for stop_id in fetch_keys]
+            )
+
     else:
         stops_fetch = {}
         stop_ids_need_fetch = [
@@ -462,9 +499,9 @@ async def getRouteStop(co):
                 for stop_id in stop_ids_need_fetch
             ]
         )
-        RAW_STOP_LIST.write_text(
-            json.dumps(stops_fetch, ensure_ascii=False), encoding="UTF-8"
-        )
+    RAW_STOP_LIST.write_text(
+        json.dumps(stops_fetch, ensure_ascii=False), encoding="UTF-8"
+    )
 
     for stop_id, _ in stops.items():
         if stop_id not in gtfsStops:
