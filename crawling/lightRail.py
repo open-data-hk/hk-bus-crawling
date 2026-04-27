@@ -8,19 +8,13 @@ import logging
 
 import httpx
 from crawl_utils import emitRequest
-from pyproj import Transformer
-from utils import DATA_DIR
+from utils import DATA_DIR, query_igeocom_geojson
 
 BASE_URL = "https://opendata.mtr.com.hk/data"
-GEODATA_URL = "https://geodata.gov.hk/gs/api/v1.0.0"
 
 
 def routes_stops_url():
     return BASE_URL + "/light_rail_routes_and_stops.csv"
-
-
-def location_search_url(query: str):
-    return GEODATA_URL + "/locationSearch?q=" + query
 
 
 # List of Circular Routes
@@ -47,11 +41,17 @@ async def getRouteStop(co="lightRail"):
         return
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
 
-    epsgTransformer = Transformer.from_crs("epsg:2326", "epsg:4326")
-
     routeList = {}
     stopList = {}
     routeCollection = set()
+
+    igeocom_features = query_igeocom_geojson(class_code="TRS", type_code="LRA")
+    stations = {}
+
+    for feature in igeocom_features:
+        raw_chi_name = feature["properties"]["CHINESENAME"]
+        chi_name = raw_chi_name.replace("輕鐵－", "")
+        stations[chi_name] = feature
 
     r = await emitRequest(routes_stops_url(), a_client)
     reader = csv.reader(r.text.split("\n"))
@@ -94,20 +94,16 @@ async def getRouteStop(co="lightRail"):
             lightRailObject["stops"].append(lightRailId)
 
         if lightRailId not in stopList:
-            url = location_search_url(chn + "輕鐵站")
-            r = await emitRequest(url, a_client, headers={"Accept": "application/json"})
-            try:
-                lat, lng = epsgTransformer.transform(r.json()[0]["y"], r.json()[0]["x"])
-                stopList[lightRailId] = {
-                    "stop": lightRailId,
-                    "name_en": eng,
-                    "name_tc": chn,
-                    "lat": lat,
-                    "long": lng,
-                }
-            except BaseException:
-                logger.exception(f"Error parsing {url}: {r.text}")
-                raise
+            feature = stations[chn]
+
+            lng, lat = feature["geometry"]["coordinates"]
+            stopList[lightRailId] = {
+                "stop": lightRailId,
+                "name_en": eng,
+                "name_tc": chn,
+                "lat": lat,
+                "long": lng,
+            }
 
     with open(DATA_DIR / "routeList.lightRail.json", "w", encoding="UTF-8") as f:
         f.write(
