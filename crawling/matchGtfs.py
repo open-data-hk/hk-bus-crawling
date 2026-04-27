@@ -23,10 +23,12 @@ def isNameMatch(name_a, name_b):
 # the actual servicing routes may skip some stop in the coStops
 # this DP function is trying to map the coStops back to GTFS stops
 
+FERRY_COS = set(["hkkf"])
+
 
 def matchStopsByDp(coStops, gtfsStops, co, debug=False):
-    # handle unknown stop
-    co = "unknown" if co not in gtfsStops[0]["stopName"] else co
+    if co in FERRY_COS:
+        co = "ferry"
     if len(gtfsStops) > len(coStops) + 1:
         return [], INFINITY_DIST
     if len(gtfsStops) - len(coStops) == 1:
@@ -47,7 +49,7 @@ def matchStopsByDp(coStops, gtfsStops, co, debug=False):
             coStop = coStops[j]
             dist = (
                 0
-                if coStop["name_tc"] == gtfsStop["stopName"][co]
+                if coStop["name_tc"] == gtfsStop["stopName"][co]["tc"]
                 else haversine(
                     (float(coStop["lat"]), float(coStop["long"])),
                     (gtfsStop["lat"], gtfsStop["lng"]),

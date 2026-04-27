@@ -76,8 +76,8 @@ def main():
         for stopId in route["stops"]:
             stopList[stopId] = {
                 "stop": stopId,
-                "name_en": gtfsStops[stopId]["stopName"]["unknown"]["en"],
-                "name_tc": gtfsStops[stopId]["stopName"]["unknown"]["tc"],
+                "name_en": gtfsStops[stopId]["stopName"]["ferry"]["en"],
+                "name_tc": gtfsStops[stopId]["stopName"]["ferry"]["tc"],
                 "lat": gtfsStops[stopId]["lat"],
                 "long": gtfsStops[stopId]["lng"],
             }

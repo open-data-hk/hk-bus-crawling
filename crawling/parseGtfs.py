@@ -189,12 +189,27 @@ async def parseGtfs():
     # TODO: understand what is nameReg
     nameReg = re.compile("\\[(.*)\\] (.*)")
 
-    def parseStopName(name):
+    def parseStopName(name: str, stop_id: str):
         ret = {}
         for stop_name_raw in name.split("|"):
             matches = nameReg.findall(stop_name_raw)
+            # if it is not a bus stop (no [company] in the name)
             if len(matches) == 0:
-                return {"unknown": stop_name_raw}
+                # match the pattern of stop_id
+                # it correlated with stop_id in <Routes and fares of public transport> dataset
+                if re.match(r"200\d{5}", stop_id):
+                    # GMB stop id is 8-digit starts with 2, e.g. 20022900
+                    ret["gmb"] = stop_name_raw
+                elif re.match(r"99\d{3}", stop_id):
+                    # Tram stop id is 5-digit starts with 99, e.g. 99313
+                    ret["tram"] = stop_name_raw
+                elif re.match(r"80000\d{3}", stop_id) or re.match(r"101\d{3}", stop_id):
+                    # Ferry stop id is either: 8-digit starts with 8, or 6-digit starts with 1
+                    ret["ferry"] = stop_name_raw
+                else:
+                    logger.warning(
+                        f"Unable to parseStopName, name: {name}, stop_id: {stop_id}"
+                    )
             for co, gtfsName in matches:
                 # e.g. [KMB+CTB] 油麻地碧街/<BR>碧街, 弥敦道
                 # kmb: 油麻地碧街, ctb: 碧街, 弥敦道
@@ -221,7 +236,7 @@ async def parseGtfs():
         lang_key = LANG_CONFIG[lang]["lang_key"]
         with open(gtfs_dirs[lang] / "stops.txt", "r", encoding="UTF-8") as f:
             for row in csv.DictReader(f):
-                for co, name in parseStopName(row["stop_name"]).items():
+                for co, name in parseStopName(row["stop_name"], row["stop_id"]).items():
                     if co not in stopList[row["stop_id"]]["stopName"]:
                         stopList[row["stop_id"]]["stopName"][co] = {}
                     # breaking changes: multiple lang names per co
