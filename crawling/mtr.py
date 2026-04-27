@@ -11,7 +11,6 @@ from crawl_utils import emitRequest
 from utils import DATA_DIR, query_igeocom_geojson
 
 BASE_URL = "https://opendata.mtr.com.hk/data"
-GEODATA_URL = "https://geodata.gov.hk/gs/api/v1.0.0"
 
 
 def lines_stations_url():
