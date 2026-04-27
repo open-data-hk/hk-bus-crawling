@@ -53,15 +53,18 @@ def orig_dest(
             f"{route_long_name} has more than 1 hyphen, orig & dest may parse wrongly"
         )
     orig = name_split[0]
-    # TODO: correctly handle tc sc
-    dest = name_split[1].replace(" (CIRCULAR)", "")
+
+    # TODO: fix dataset error, e.g. (循環線) in sc version
+    # should ask TD to fix it
 
     if lang == "tc":
-        # TODO: tc version should not contains English?
+        dest = name_split[1].replace("(循環線)", "").rstrip()
         return {"tc": orig}, {"tc": dest}
     elif lang == "sc":
+        dest = name_split[1].replace("(循环线)", "").rstrip()
         return {"sc": orig}, {"sc": dest}
     elif lang == "en":
+        dest = name_split[1].replace("(CIRCULAR)", "").rstrip()
         return {"en": orig}, {"en": dest}
 
 
