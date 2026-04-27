@@ -43,7 +43,7 @@ def stop_url(stop_id):
     return BASE_URL + "/stop/" + str(stop_id)
 
 
-def last_update_url(data_type: Literal["route", "stop", "route_stop"]) -> str:
+def last_update_url(data_type: Literal["route", "stop", "route-stop"]) -> str:
     return BASE_URL + "/last-update/" + data_type
 
 
@@ -93,6 +93,9 @@ async def get_route_stops(
             a_client,
         )
     result = r.json()["data"]
+    # if not result["route_stops"]:
+    #     # don't save if empty route_stops
+    #     return
     key = f"{route_id}-{route_seq}"
     all_route_stops[key] = result
 
@@ -108,7 +111,7 @@ async def get_stop(stop_id: int, stops_fetch: dict, a_client) -> None:
 
 
 async def get_last_update(
-    data_type: Literal["route", "stop", "route_stop"], a_client
+    data_type: Literal["route", "stop", "route-stop"], a_client
 ) -> None:
     async with req_stops_limit:
         r = await emitRequest(last_update_url(data_type), a_client)
@@ -364,6 +367,57 @@ async def getRouteStop(co):
     if RAW_ROUTE_STOP_LIST.exists():
         logger.info(f"{RAW_ROUTE_STOP_LIST} already exists, loading...")
         all_route_stops = json.loads(RAW_ROUTE_STOP_LIST.read_text("utf-8"))
+
+        local_last_update = {
+            key: route_stops["data_timestamp"]
+            for key, route_stops in all_route_stops.items()
+        }
+
+        remote_record = await get_last_update("route-stop", a_client)
+        remote_last_update = {
+            f"{entry['route_id']}-{entry['route_seq']}": entry["last_update_date"]
+            for entry in remote_record
+        }
+
+        local_keys = set(local_last_update.keys())
+        # remote_key does not imply all are running (i.e. contain outdate route stops)
+        # empty route_stops found for some keys
+        # use all_routes instead
+        remote_keys = set(remote_last_update.keys())
+        required_keys = {
+            f"{route_id}-{direction['route_seq']}"
+            for route_id, route in all_routes.items()
+            for direction in route["directions"]
+        }
+
+        delete_keys = local_keys - remote_keys
+        fetch_keys = required_keys - local_keys
+
+        for key in delete_keys:
+            del all_route_stops[key]
+
+        for key in local_keys & remote_keys:
+            local_ts = datetime.datetime.fromisoformat(local_last_update[key])
+            remote_ts = datetime.datetime.fromisoformat(
+                remote_last_update[key]
+            ).replace(tzinfo=ZoneInfo("Asia/Hong_Kong"))
+            if remote_ts > local_ts:
+                fetch_keys.add(key)
+
+        if fetch_keys:
+            logger.info(f"Fetching route stops of keys: {fetch_keys}")
+            fetch_directions = [
+                (route_id, int(route_seq))
+                for key in fetch_keys
+                for route_id, route_seq in [key.split("-")]
+            ]
+            await asyncio.gather(
+                *[
+                    get_route_stops(route_id, route_seq, all_route_stops, a_client)
+                    for route_id, route_seq in fetch_directions
+                ]
+            )
+
     else:
         all_route_stops = {}
         all_route_directions = [
@@ -377,9 +431,9 @@ async def getRouteStop(co):
                 for route_id, route_seq in all_route_directions
             ]
         )
-        RAW_ROUTE_STOP_LIST.write_text(
-            json.dumps(all_route_stops, ensure_ascii=False), encoding="UTF-8"
-        )
+    RAW_ROUTE_STOP_LIST.write_text(
+        json.dumps(all_route_stops, ensure_ascii=False), encoding="UTF-8"
+    )
 
     for route_id, route in all_routes.items():
         process_route_directions(route, route["route_code"], all_route_stops)
