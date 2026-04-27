@@ -4,7 +4,6 @@ import datetime
 import json
 import logging
 import re
-import sys
 import zipfile
 from os import path
 from typing import Literal
@@ -22,7 +21,6 @@ LANG_CONFIG = {
         "version_key": "GTFS-TC",
         # TODO: change to "tc"
         "lang_key": "zh",
-        "output": "gtfs-tc.json",
     },
     "en": {
         "url": "https://static.data.gov.hk/td/pt-headway-en/gtfs.zip",
@@ -30,7 +28,6 @@ LANG_CONFIG = {
         "dir": "gtfs-en",
         "version_key": "GTFS-EN",
         "lang_key": "en",
-        "output": "gtfs-en.json",
     },
     "sc": {
         "url": "https://static.data.gov.hk/td/pt-headway-sc/gtfs.zip",
@@ -38,9 +35,10 @@ LANG_CONFIG = {
         "dir": "gtfs-sc",
         "version_key": "GTFS-SC",
         "lang_key": "sc",
-        "output": "gtfs-sc.json",
     },
 }
+
+ALL_LANGS = list(LANG_CONFIG.keys())
 
 
 def takeFirst(elem):
@@ -50,74 +48,52 @@ def takeFirst(elem):
 def orig_dest(
     route_long_name: str, lang: Literal["tc", "sc", "en"]
 ) -> tuple[dict, dict]:
-    orig_langs = {
-        "zh": "",
-        "en": "",
-        # TODO: add sc
-        # "sc": "",
-    }
-    dest_langs = {
-        "zh": "",
-        "en": "",
-        # "sc": "",
-    }
-
     # TODO: inspect if more than 1 hyphen
     name_split = route_long_name.split(" - ")
     orig = name_split[0]
-    dest = name_split[1]
+    # TODO: correctly handle tc sc
+    dest = name_split[1].replace(" (CIRCULAR)", "")
 
     if lang == "tc":
         # TODO: tc version should not contains English?
-        dest = dest.replace(" (CIRCULAR)", "")
-
-        orig_langs["zh"] = orig
-        dest_langs["zh"] = dest
+        return {"zh": orig}, {"zh": dest}
     elif lang == "sc":
-        # follow tc atm, TODO: use sc data
-        # TODO: tc version should not contains English?
-        dest = dest.replace(" (CIRCULAR)", "")
-
-        orig_langs["sc"] = orig
-        dest_langs["sc"] = dest
+        return {"sc": orig}, {"sc": dest}
     elif lang == "en":
-        dest = dest.replace(" (CIRCULAR)", "")
-
-        orig_langs["en"] = orig
-        dest_langs["en"] = dest
-
-    return orig_langs, dest_langs
+        return {"en": orig}, {"en": dest}
 
 
 def route_no(
     route_short_name: str, route_id: str, lang: Literal["tc", "sc", "en"]
 ) -> str:
-    if lang == "tc":
-        return route_short_name
-    elif lang == "sc":
-        # follow tc behaviour
-        # TODO: use sc
+    if lang in ("tc", "sc"):
         return route_short_name
     elif lang == "en":
         return route_short_name if route_short_name != "" else route_id
 
 
-async def parseGtfs(lang="tc"):
+async def fetchAndExtract(lang: str, a_client: httpx.AsyncClient):
     cfg = LANG_CONFIG[lang]
-    # TODO: remove lang_key if useless
-    lang_key = cfg["lang_key"]
-    gtfs_dir = DATA_DIR / cfg["dir"]
-
-    a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
     if not path.isfile(DATA_DIR / cfg["zip"]):
         r = await emitRequest(cfg["url"], a_client)
         open(DATA_DIR / cfg["zip"], "wb").write(r.content)
-
+    gtfs_dir = DATA_DIR / cfg["dir"]
     with zipfile.ZipFile(DATA_DIR / cfg["zip"], "r") as zip_ref:
         zip_ref.extractall(gtfs_dir)
         version = min([f.date_time for f in zip_ref.infolist()])
         version = datetime.datetime(*version, tzinfo=ZoneInfo("Asia/Hong_Kong"))
         store_version(cfg["version_key"], version.isoformat())
+    return lang, gtfs_dir
+
+
+async def parseGtfs():
+    langs = ALL_LANGS
+
+    a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
+
+    results = await asyncio.gather(*[fetchAndExtract(lang, a_client) for lang in langs])
+    gtfs_dirs = dict(results)
+    primary_dir = gtfs_dirs[langs[0]]
 
     routeList = {}
     stopList = {}
@@ -126,7 +102,8 @@ async def parseGtfs(lang="tc"):
         open(DATA_DIR / "routeTime.json", "r", encoding="UTF-8")
     )
 
-    with open(gtfs_dir / "routes.txt", "r", encoding="UTF-8") as csvfile:
+    # Initialize route structure from primary lang
+    with open(primary_dir / "routes.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [
@@ -137,15 +114,14 @@ async def parseGtfs(lang="tc"):
             route_type,
             route_url,
         ] in reader:
-            orig_langs, dest_langs = orig_dest(route_long_name, lang)
             routeList[route_id] = {
                 "co": agency_id.replace("LWB", "KMB").lower().split("+"),
-                "route": route_no(route_short_name, route_id, lang),
+                "route": route_no(route_short_name, route_id, langs[0]),
                 "stops": {},
                 "fares": {},
                 "freq": {},
-                "orig": orig_langs,
-                "dest": dest_langs,
+                "orig": {},
+                "dest": {},
                 "jt": (
                     routeJourneyTime[route_id]["journeyTime"]
                     if route_id in routeJourneyTime
@@ -153,8 +129,30 @@ async def parseGtfs(lang="tc"):
                 ),
             }
 
+    # Merge route names from each lang
+    for lang in langs:
+        with open(gtfs_dirs[lang] / "routes.txt", "r", encoding="UTF-8") as csvfile:
+            reader = csv.reader(csvfile)
+            next(reader, None)
+            for [
+                route_id,
+                agency_id,
+                route_short_name,
+                route_long_name,
+                _,
+                _,
+            ] in reader:
+                orig_l, dest_l = orig_dest(route_long_name, lang)
+                # TODO: cleaner update?
+                routeList[route_id]["orig"].update(
+                    {k: v for k, v in orig_l.items() if v}
+                )
+                routeList[route_id]["dest"].update(
+                    {k: v for k, v in dest_l.items() if v}
+                )
+
     # parse timetable
-    with open(gtfs_dir / "trips.txt", "r", encoding="UTF-8") as csvfile:
+    with open(primary_dir / "trips.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [route_id, service_id, trip_id] in reader:
@@ -166,7 +164,7 @@ async def parseGtfs(lang="tc"):
             if start_time not in routeList[route_id]["freq"][bound][calendar]:
                 routeList[route_id]["freq"][bound][calendar][start_time] = None
 
-    with open(gtfs_dir / "frequencies.txt", "r", encoding="UTF-8") as csvfile:
+    with open(primary_dir / "frequencies.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [trip_id, _start_time, end_time, headway_secs] in reader:
@@ -177,7 +175,7 @@ async def parseGtfs(lang="tc"):
             )
 
     # parse stop seq
-    with open(gtfs_dir / "stop_times.txt", "r", encoding="UTF-8") as csvfile:
+    with open(primary_dir / "stop_times.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [
@@ -196,7 +194,7 @@ async def parseGtfs(lang="tc"):
             routeList[route_id]["stops"][bound][stop_sequence] = stop_id
 
     # parse fares
-    with open(gtfs_dir / "fare_attributes.txt", "r", encoding="UTF-8") as csvfile:
+    with open(primary_dir / "fare_attributes.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [
@@ -228,21 +226,24 @@ async def parseGtfs(lang="tc"):
             _tmp.sort(key=takeFirst)
             routeList[route_id]["fares"][bound] = [v[0] for k, v in _tmp]
 
+    # TODO: understand what is nameReg
     nameReg = re.compile("\\[(.*)\\] (.*)")
 
     def parseStopName(name):
         ret = {}
-        for str in name.split("|"):
-            matches = nameReg.findall(str)
+        for stop_name_raw in name.split("|"):
+            matches = nameReg.findall(stop_name_raw)
             if len(matches) == 0:
-                return {"unknown": str}
+                return {"unknown": stop_name_raw}
             for co, gtfsName in matches:
+                # TODO: improve code clarity
                 x, y = co.split("+"), gtfsName.split("/<BR>")
                 for i in range(len(x)):
                     ret[x[i].lower().replace("lwb", "kmb")] = y[i if i < len(y) else 0]
         return ret
 
-    with open(gtfs_dir / "stops.txt", "r", encoding="UTF-8") as csvfile:
+    # Initialize stopList with coords from primary lang
+    with open(primary_dir / "stops.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [
@@ -256,12 +257,34 @@ async def parseGtfs(lang="tc"):
         ] in reader:
             stopList[stop_id] = {
                 "stopId": stop_id,
-                "stopName": parseStopName(stop_name),
+                "stopName": {},
                 "lat": float(stop_lat),
                 "lng": float(stop_lon),
             }
 
-    with open(gtfs_dir / "calendar.txt", "r", encoding="UTF-8") as csvfile:
+    # Merge stop names from each lang: stopName[co][lang_key] = name
+    for lang in langs:
+        lang_key = LANG_CONFIG[lang]["lang_key"]
+        with open(gtfs_dirs[lang] / "stops.txt", "r", encoding="UTF-8") as csvfile:
+            reader = csv.reader(csvfile)
+            next(reader, None)
+            for [
+                stop_id,
+                stop_name,
+                stop_lat,
+                stop_lon,
+                _,
+                _,
+                _,
+            ] in reader:
+                for co, name in parseStopName(stop_name).items():
+                    if co not in stopList[stop_id]["stopName"]:
+                        stopList[stop_id]["stopName"][co] = {}
+                    # breaking changes: multiple lang names per co
+                    # TODO: make sure not breaking depending script
+                    stopList[stop_id]["stopName"][co][lang_key] = name
+
+    with open(primary_dir / "calendar.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for line in reader:
@@ -270,7 +293,7 @@ async def parseGtfs(lang="tc"):
             )
             serviceDayMap[service_id] = [sun, mon, tue, wed, thur, fri, sat]
 
-    with open(DATA_DIR / cfg["output"], "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / "gtfs.json", "w", encoding="UTF-8") as f:
         f.write(
             json.dumps(
                 {
@@ -288,5 +311,5 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logger = logging.getLogger(__name__)
-    lang = sys.argv[1] if len(sys.argv) > 1 else "tc"
-    asyncio.run(parseGtfs(lang))
+
+    asyncio.run(parseGtfs())
