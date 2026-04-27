@@ -4,32 +4,121 @@ import datetime
 import json
 import logging
 import re
+import sys
 import zipfile
 from os import path
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 import httpx
 from crawl_utils import emitRequest, store_version
 from utils import DATA_DIR
 
+LANG_CONFIG = {
+    "tc": {
+        "url": "https://static.data.gov.hk/td/pt-headway-tc/gtfs.zip",
+        # TODO: append "-tc"
+        "zip": "gtfs.zip",
+        "dir": "gtfs",
+        "version_key": "GTFS",
+        # TODO: change to "tc"
+        "lang_key": "zh",
+        "output": "gtfs.json",
+    },
+    "en": {
+        "url": "https://static.data.gov.hk/td/pt-headway-en/gtfs.zip",
+        "zip": "gtfs-en.zip",
+        "dir": "gtfs-en",
+        "version_key": "GTFS-EN",
+        "lang_key": "en",
+        "output": "gtfs-en.json",
+    },
+    "sc": {
+        "url": "https://static.data.gov.hk/td/pt-headway-sc/gtfs.zip",
+        "zip": "gtfs-sc.zip",
+        "dir": "gtfs-sc",
+        "version_key": "GTFS-SC",
+        "lang_key": "sc",
+        "output": "gtfs-sc.json",
+    },
+}
+
 
 def takeFirst(elem):
     return int(elem[0])
 
 
-async def parseGtfs():
-    a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
-    if not path.isfile(DATA_DIR / "gtfs.zip"):
-        r = await emitRequest(
-            "https://static.data.gov.hk/td/pt-headway-tc/gtfs.zip", a_client
-        )
-        open(DATA_DIR / "gtfs.zip", "wb").write(r.content)
+def orig_dest(
+    route_long_name: str, lang: Literal["tc", "sc", "en"]
+) -> tuple[dict, dict]:
+    orig_langs = {
+        "zh": "",
+        "en": "",
+        # TODO: add sc
+        # "sc": "",
+    }
+    dest_langs = {
+        "zh": "",
+        "en": "",
+        # "sc": "",
+    }
 
-    with zipfile.ZipFile(DATA_DIR / "gtfs.zip", "r") as zip_ref:
-        zip_ref.extractall(DATA_DIR / "gtfs")
+    # TODO: inspect if more than 1 hyphen
+    name_split = route_long_name.split(" - ")
+    orig = name_split[0]
+    dest = name_split[1]
+
+    if lang == "tc":
+        # TODO: tc version should not contains English?
+        dest = dest.replace(" (CIRCULAR)", "")
+
+        orig_langs["zh"] = orig
+        dest_langs["zh"] = dest
+    elif lang == "sc":
+        # follow tc atm, TODO: use sc data
+        # TODO: tc version should not contains English?
+        dest = dest.replace(" (CIRCULAR)", "")
+
+        orig_langs["sc"] = orig
+        dest_langs["sc"] = dest
+    elif lang == "en":
+        dest = dest.replace(" (CIRCULAR)", "")
+
+        orig_langs["en"] = orig
+        dest_langs["en"] = dest
+
+    return orig_langs, dest_langs
+
+
+def route_no(
+    route_short_name: str, route_id: str, lang: Literal["tc", "sc", "en"]
+) -> str:
+    if lang == "tc":
+        return route_short_name
+    elif lang == "sc":
+        # follow tc behaviour
+        # TODO: use sc
+        return route_short_name
+    elif lang == "en":
+        return route_short_name if route_short_name != "" else route_id
+
+
+async def parseGtfs(lang="tc"):
+    cfg = LANG_CONFIG[lang]
+    # TODO: remove lang_key if useless
+    lang_key = cfg["lang_key"]
+    gtfs_dir = DATA_DIR / cfg["dir"]
+
+    a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
+    if not path.isfile(DATA_DIR / cfg["zip"]):
+        r = await emitRequest(cfg["url"], a_client)
+        open(DATA_DIR / cfg["zip"], "wb").write(r.content)
+
+    with zipfile.ZipFile(DATA_DIR / cfg["zip"], "r") as zip_ref:
+        zip_ref.extractall(gtfs_dir)
         version = min([f.date_time for f in zip_ref.infolist()])
         version = datetime.datetime(*version, tzinfo=ZoneInfo("Asia/Hong_Kong"))
-        store_version("GTFS", version.isoformat())
+        store_version(cfg["version_key"], version.isoformat())
 
     routeList = {}
     stopList = {}
@@ -38,7 +127,7 @@ async def parseGtfs():
         open(DATA_DIR / "routeTime.json", "r", encoding="UTF-8")
     )
 
-    with open(DATA_DIR / "gtfs/routes.txt", "r", encoding="UTF-8") as csvfile:
+    with open(gtfs_dir / "routes.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [
@@ -49,20 +138,15 @@ async def parseGtfs():
             route_type,
             route_url,
         ] in reader:
+            orig_langs, dest_langs = orig_dest(route_long_name, lang)
             routeList[route_id] = {
                 "co": agency_id.replace("LWB", "KMB").lower().split("+"),
-                "route": route_short_name,
+                "route": route_no(route_short_name, route_id, lang),
                 "stops": {},
                 "fares": {},
                 "freq": {},
-                "orig": {
-                    "zh": route_long_name.split(" - ")[0],
-                    "en": "",
-                },
-                "dest": {
-                    "zh": route_long_name.split(" - ")[1].replace(" (CIRCULAR)", ""),
-                    "en": "",
-                },
+                "orig": orig_langs,
+                "dest": dest_langs,
                 "jt": (
                     routeJourneyTime[route_id]["journeyTime"]
                     if route_id in routeJourneyTime
@@ -71,7 +155,7 @@ async def parseGtfs():
             }
 
     # parse timetable
-    with open(DATA_DIR / "gtfs/trips.txt", "r", encoding="UTF-8") as csvfile:
+    with open(gtfs_dir / "trips.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [route_id, service_id, trip_id] in reader:
@@ -83,7 +167,7 @@ async def parseGtfs():
             if start_time not in routeList[route_id]["freq"][bound][calendar]:
                 routeList[route_id]["freq"][bound][calendar][start_time] = None
 
-    with open(DATA_DIR / "gtfs/frequencies.txt", "r", encoding="UTF-8") as csvfile:
+    with open(gtfs_dir / "frequencies.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [trip_id, _start_time, end_time, headway_secs] in reader:
@@ -94,7 +178,7 @@ async def parseGtfs():
             )
 
     # parse stop seq
-    with open(DATA_DIR / "gtfs/stop_times.txt", "r", encoding="UTF-8") as csvfile:
+    with open(gtfs_dir / "stop_times.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [
@@ -113,7 +197,7 @@ async def parseGtfs():
             routeList[route_id]["stops"][bound][stop_sequence] = stop_id
 
     # parse fares
-    with open(DATA_DIR / "gtfs/fare_attributes.txt", "r", encoding="UTF-8") as csvfile:
+    with open(gtfs_dir / "fare_attributes.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [
@@ -159,7 +243,7 @@ async def parseGtfs():
                     ret[x[i].lower().replace("lwb", "kmb")] = y[i if i < len(y) else 0]
         return ret
 
-    with open(DATA_DIR / "gtfs/stops.txt", "r", encoding="UTF-8") as csvfile:
+    with open(gtfs_dir / "stops.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [
@@ -178,7 +262,7 @@ async def parseGtfs():
                 "lng": float(stop_lon),
             }
 
-    with open(DATA_DIR / "gtfs/calendar.txt", "r", encoding="UTF-8") as csvfile:
+    with open(gtfs_dir / "calendar.txt", "r", encoding="UTF-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for line in reader:
@@ -187,7 +271,7 @@ async def parseGtfs():
             )
             serviceDayMap[service_id] = [sun, mon, tue, wed, thur, fri, sat]
 
-    with open(DATA_DIR / "gtfs.json", "w", encoding="UTF-8") as f:
+    with open(DATA_DIR / cfg["output"], "w", encoding="UTF-8") as f:
         f.write(
             json.dumps(
                 {
@@ -205,4 +289,5 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logger = logging.getLogger(__name__)
-    asyncio.run(parseGtfs())
+    lang = sys.argv[1] if len(sys.argv) > 1 else "tc"
+    asyncio.run(parseGtfs(lang))
