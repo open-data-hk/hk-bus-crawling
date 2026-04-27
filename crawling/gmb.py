@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 import asyncio
 import csv
+import datetime
 import json
 import logging
 import time
-from typing import Any
+from typing import Any, Literal
+from zoneinfo import ZoneInfo
 
 import httpx
 from crawl_utils import emitRequest, get_request_limit
@@ -29,12 +31,20 @@ def region_routes_url(region: str):
     return BASE_URL + "/route/" + region
 
 
-def route_url(region: str, route_no: str):
+def route_url_by_region_route_no(region: str, route_no: str):
     return BASE_URL + "/route/" + region + "/" + route_no
+
+
+def route_url_by_route_id(route_id: int):
+    return BASE_URL + "/route/" + str(route_id)
 
 
 def stop_url(stop_id):
     return BASE_URL + "/stop/" + str(stop_id)
+
+
+def last_update_url(data_type: Literal["route", "stop", "route_stop"]) -> str:
+    return BASE_URL + "/last-update/" + data_type
 
 
 # Single API request
@@ -50,12 +60,21 @@ async def get_routes_region(region: str, route_nos_by_region: dict, a_client) ->
 req_route_limit = asyncio.Semaphore(get_request_limit())
 
 
-async def get_route(region: str, route_no: str, all_routes: dict, a_client) -> None:
+async def get_route_by_region_route_no(
+    region: str, route_no: str, all_routes: dict, a_client
+) -> None:
     async with req_route_limit:
-        r = await emitRequest(route_url(region, route_no), a_client)
+        r = await emitRequest(route_url_by_region_route_no(region, route_no), a_client)
+        routes = r.json()["data"]
+        for route in routes:
+            all_routes[str(route["route_id"])] = route
+
+
+async def get_route_by_id(route_id: int, all_routes: dict, a_client) -> None:
+    async with req_route_limit:
+        r = await emitRequest(route_url_by_route_id(route_id), a_client)
         result = r.json()["data"]
-        key = f"{region}-{route_no}"
-        all_routes[key] = result
+        all_routes[str(route_id)] = result[0]
 
 
 req_route_stops_limit = asyncio.Semaphore(get_request_limit())
@@ -86,6 +105,14 @@ async def get_stop(stop_id: int, stops_fetch: dict, a_client) -> None:
         r = await emitRequest(stop_url(stop_id), a_client)
         result = r.json()["data"]
         stops_fetch[stop_id] = result
+
+
+async def get_last_update(
+    data_type: Literal["route", "stop", "route_stop"], a_client
+) -> None:
+    async with req_stops_limit:
+        r = await emitRequest(last_update_url(data_type), a_client)
+        return r.json()["data"]
 
 
 async def getRouteStop(co):
@@ -265,22 +292,73 @@ async def getRouteStop(co):
         for route_no in region_data["routes"]
     ]
 
-    # routes key by "{region}-{route_no}", e.g. KLN-82
-    all_routes: dict[str, list[dict]] = {}
+    # routes key by route_id, e.g. 2001558 (str)
+    all_routes: dict[str, dict] = {}
 
     if RAW_ROUTE_LIST.exists():
         logger.info(f"{RAW_ROUTE_LIST} already exists, loading...")
         all_routes = json.loads(RAW_ROUTE_LIST.read_text("utf-8"))
+
+        # handle deprecate all_routes format
+        # routes key by "{region}-{route_no}", e.g. KLN-82 : list of routes
+        first_key = list(all_routes.keys())[0]
+        if first_key[0].isalpha():
+            # flatten to key by route_id
+            all_routes = {
+                route["route_id"]: route
+                for routes in all_routes.values()
+                for route in routes
+            }
+
+        local_last_update = {
+            str(route_id): route["data_timestamp"]
+            for route_id, route in all_routes.items()
+        }
+
+        remote_record = await get_last_update("route", a_client)
+        remote_last_update = {
+            str(route["route_id"]): route["last_update_date"] for route in remote_record
+        }
+
+        local_route_ids = set(local_last_update.keys())
+        remote_route_ids = set(remote_last_update.keys())
+
+        delete_route_ids = local_route_ids - remote_route_ids
+        create_route_ids = remote_route_ids - local_route_ids
+        common_route_ids = local_route_ids & remote_route_ids
+        fetch_route_ids = create_route_ids
+
+        for route_id in delete_route_ids:
+            del all_routes[route_id]
+
+        for route_id in common_route_ids:
+            local_ts = datetime.datetime.fromisoformat(local_last_update[route_id])
+            # timezone in last-update endpoint is +0, must set +8 before comparison
+            remote_ts = datetime.datetime.fromisoformat(
+                remote_last_update[route_id]
+            ).replace(tzinfo=ZoneInfo("Asia/Hong_Kong"))
+            if remote_ts > local_ts:
+                fetch_route_ids.add(remote_ts)
+
+        if fetch_route_ids:
+            logger.info(f"Fetching routes of ids: {fetch_route_ids}")
+            await asyncio.gather(
+                *[
+                    get_route_by_id(route_id, all_routes, a_client)
+                    for route_id in fetch_route_ids
+                ]
+            )
+
     else:
         await asyncio.gather(
             *[
-                get_route(region, route, all_routes, a_client)
+                get_route_by_region_route_no(region, route, all_routes, a_client)
                 for region, route in all_region_route_no
             ]
         )
-        RAW_ROUTE_LIST.write_text(
-            json.dumps(all_routes, ensure_ascii=False), encoding="UTF-8"
-        )
+    RAW_ROUTE_LIST.write_text(
+        json.dumps(all_routes, ensure_ascii=False), encoding="UTF-8"
+    )
 
     # key: {route_id}-{route_seq}, e.g. 2006408-1
     if RAW_ROUTE_STOP_LIST.exists():
@@ -289,9 +367,8 @@ async def getRouteStop(co):
     else:
         all_route_stops = {}
         all_route_directions = [
-            (route["route_id"], direction["route_seq"])
-            for route_key, single_route_no_routes in all_routes.items()
-            for route in single_route_no_routes
+            (route_id, direction["route_seq"])
+            for route_id, route in all_routes.items()
             for direction in route["directions"]
         ]
         await asyncio.gather(
@@ -304,10 +381,8 @@ async def getRouteStop(co):
             json.dumps(all_route_stops, ensure_ascii=False), encoding="UTF-8"
         )
 
-    for route_key, single_route_no_routes in all_routes.items():
-        region, route_no = route_key.split("-")
-        for route in single_route_no_routes:
-            process_route_directions(route, route_no, all_route_stops)
+    for route_id, route in all_routes.items():
+        process_route_directions(route, route["route_code"], all_route_stops)
 
     routeList.sort(key=lambda a: a["gtfsId"])
 
