@@ -60,6 +60,15 @@ jobs:
 
       - name: Install dependencies
         run: poetry install
+
+      - name: Download GMB raw data
+        uses: actions/download-artifact@v8
+        # avoid breaking for the first time, as no artifact available
+        continue-on-error: true
+        with:
+          name: gmb-raw-data
+          path: data/
+
       - name: Crawling resources
         shell: bash
         env:
@@ -91,6 +100,17 @@ jobs:
         run: |
           md5sum data/routeFareList.min.json | cut -f1 -d ' ' | tr -d $'\n' > data/routeFareList.md5
           md5sum data/routeFareList.alpha.min.json | cut -f1 -d ' ' | tr -d $'\n' > data/routeFareList.alpha.md5
+
+      - name: Archive GMB raw data
+        uses: actions/upload-artifact@v7
+        with:
+          name: gmb-raw-data
+          retention-days: 14
+          path: |
+            data/gmb.raw.routeNoList.json
+            data/gmb.raw.routeList.json
+            data/gmb.raw.routeStopList.json
+            data/gmb.raw.stopList.json
 
       - name: Archive crawling outputs
         uses: actions/upload-artifact@v7
