@@ -96,7 +96,7 @@ async def getRouteStop(co):
     a_client = httpx.AsyncClient()
     # parse gtfs service_id
     serviceIdMap = {}
-    with open(DATA_DIR / "gtfs/calendar.txt", "r", encoding="utf-8") as csvfile:
+    with open(DATA_DIR / "gtfs-tc/calendar.txt", "r", encoding="utf-8") as csvfile:
         reader = csv.reader(csvfile)
         headers = next(reader, None)
         for [service_id, mon, tue, wed, thur, fri, sat, sun, *tmp] in reader:
@@ -315,7 +315,7 @@ async def getRouteStop(co):
         json.dump(routeList, f, ensure_ascii=False)
     logger.info("Route done")
 
-    with open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8") as f:
+    with open(DATA_DIR / "gtfs-tc.json", "r", encoding="UTF-8") as f:
         gtfs = json.load(f)
         gtfsStops = gtfs["stopList"]
 

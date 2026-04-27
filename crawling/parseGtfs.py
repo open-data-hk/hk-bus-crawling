@@ -17,13 +17,12 @@ from utils import DATA_DIR
 LANG_CONFIG = {
     "tc": {
         "url": "https://static.data.gov.hk/td/pt-headway-tc/gtfs.zip",
-        # TODO: append "-tc"
-        "zip": "gtfs.zip",
-        "dir": "gtfs",
-        "version_key": "GTFS",
+        "zip": "gtfs-tc.zip",
+        "dir": "gtfs-tc",
+        "version_key": "GTFS-TC",
         # TODO: change to "tc"
         "lang_key": "zh",
-        "output": "gtfs.json",
+        "output": "gtfs-tc.json",
     },
     "en": {
         "url": "https://static.data.gov.hk/td/pt-headway-en/gtfs.zip",

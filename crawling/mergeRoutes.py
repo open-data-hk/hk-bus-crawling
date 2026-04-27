@@ -209,7 +209,7 @@ for route in routeList:
     route["stops"] = {co: stops for co, stops in route["stops"]}
 
 holidays = json.load(open(DATA_DIR / "holiday.json", "r", encoding="UTF-8"))
-serviceDayMap = json.load(open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8"))[
+serviceDayMap = json.load(open(DATA_DIR / "gtfs-tc.json", "r", encoding="UTF-8"))[
     "serviceDayMap"
 ]
 

@@ -50,7 +50,7 @@ async def getRouteStop(co):
         stop = (await emitRequest(pier_url(stopId), a_client)).json()["data"]
         apiStops.append(stop)
 
-    with open(DATA_DIR / "gtfs.json", "r", encoding="utf-8") as f:
+    with open(DATA_DIR / "gtfs-tc.json", "r", encoding="utf-8") as f:
         gtfsZh = json.load(f)
 
     with open(DATA_DIR / "gtfs-en.json", "r", encoding="utf-8") as f:

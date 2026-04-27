@@ -11,7 +11,7 @@ def main():
     ).exists():
         return
 
-    with open(DATA_DIR / "gtfs.json", "r", encoding="utf-8") as f:
+    with open(DATA_DIR / "gtfs-tc.json", "r", encoding="utf-8") as f:
         gtfsZh = json.load(f)
 
     with open(DATA_DIR / "gtfs-en.json", "r", encoding="utf-8") as f:

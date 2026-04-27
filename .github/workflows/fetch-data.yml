@@ -108,10 +108,10 @@ jobs:
             data/stopList*
             data/stopMap*
             data/routeTime.json
-            data/gtfs
-            data/gtfs.json
+            data/gtfs-tc
+            data/gtfs-tc.json
             data/routeGtfs*
-            data/gtfs.zip
+            data/gtfs-tc.zip
             data/ROUTE_BUS.xml
             data/route-ts/
             data/exits.mtr.json

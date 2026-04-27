@@ -11,7 +11,7 @@ def main():
     ).exists():
         return
 
-    with open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8") as f:
+    with open(DATA_DIR / "gtfs-tc.json", "r", encoding="UTF-8") as f:
         gtfs = json.load(f)
         gtfsRoutes = gtfs["routeList"]
         gtfsStops = gtfs["stopList"]

@@ -4,7 +4,7 @@ from pathlib import Path
 
 def test_identical_files():
     # TODO: add gtfs-sc.json
-    for name in ("gtfs.json", "gtfs-en.json"):
+    for name in ("gtfs-tc.json", "gtfs-en.json"):
         data = json.loads(Path(f"data/{name}").read_text(encoding="UTF-8"))
         snapshot = json.loads(
             Path(f"tests/snapshots/{name}").read_text(encoding="UTF-8")
