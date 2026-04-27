@@ -47,8 +47,11 @@ def takeFirst(elem):
 def orig_dest(
     route_long_name: str, lang: Literal["tc", "sc", "en"]
 ) -> tuple[dict, dict]:
-    # TODO: inspect if more than 1 hyphen
     name_split = route_long_name.split(" - ")
+    if len(name_split) > 2:
+        logger.warning(
+            f"{route_long_name} has more than 1 hyphen, orig & dest may parse wrongly"
+        )
     orig = name_split[0]
     # TODO: correctly handle tc sc
     dest = name_split[1].replace(" (CIRCULAR)", "")
