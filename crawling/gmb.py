@@ -315,7 +315,7 @@ async def getRouteStop(co):
         json.dump(routeList, f, ensure_ascii=False)
     logger.info("Route done")
 
-    with open(DATA_DIR / "gtfs-tc.json", "r", encoding="UTF-8") as f:
+    with open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8") as f:
         gtfs = json.load(f)
         gtfsStops = gtfs["stopList"]
 
