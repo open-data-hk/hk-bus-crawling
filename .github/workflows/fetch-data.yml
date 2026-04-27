@@ -61,13 +61,13 @@ jobs:
       - name: Install dependencies
         run: poetry install
 
-      - name: Download GMB raw data
-        uses: actions/download-artifact@v8
-        # avoid breaking for the first time, as no artifact available
-        continue-on-error: true
+      - name: Download GMB raw data from previous run
+        uses: dawidd6/action-download-artifact@v20
         with:
           name: gmb-raw-data
           path: data/
+          workflow: fetch-data.yml
+          branch: master
 
       - name: Crawling resources
         shell: bash
