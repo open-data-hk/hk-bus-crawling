@@ -8,9 +8,7 @@ python ./crawling/lrtfeeder.py pause
 python ./crawling/lightRail.py pause
 python ./crawling/mtr.py pause
 python ./crawling/parseJourneyTime.py pause
-python ./crawling/parseGtfs.py tc pause
-python ./crawling/parseGtfs.py en pause
-python ./crawling/parseGtfs.py sc pause
+python ./crawling/parseGtfs.py pause
 python ./crawling/sunferry.py pause
 python ./crawling/fortuneferry.py pause
 python ./crawling/hkkf.py pause
