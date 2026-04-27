@@ -13,7 +13,7 @@ def main(route_fare_list_json: str):
     route_fare_list["holidays"] = sorted(route_fare_list["holidays"])
 
     with open(normalized_json_name, "w") as f:
-        json.dump(route_fare_list, f, sort_keys=True, indent=4, ensure_ascii=False)
+        json.dump(route_fare_list, f, sort_keys=True, ensure_ascii=False)
 
 
 if __name__ == "__main__":
