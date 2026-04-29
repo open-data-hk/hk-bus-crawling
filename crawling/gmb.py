@@ -341,7 +341,7 @@ async def getRouteStop(co):
                 remote_last_update[route_id]
             ).replace(tzinfo=ZoneInfo("Asia/Hong_Kong"))
             if remote_ts > local_ts:
-                fetch_route_ids.add(remote_ts)
+                fetch_route_ids.add(route_id)
 
         if fetch_route_ids:
             logger.info(f"Fetching routes of ids: {fetch_route_ids}")
