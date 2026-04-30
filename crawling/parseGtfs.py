@@ -5,12 +5,14 @@ import json
 import logging
 import re
 import zipfile
+from collections import namedtuple
 from os import path
 from typing import Literal
 from zoneinfo import ZoneInfo
 
 import httpx
 from crawl_utils import emitRequest, store_version
+from gtfs_fare import compress_fares, fares_to_csv
 from utils import DATA_DIR
 
 LANG_CONFIG = {
@@ -159,29 +161,24 @@ async def parseGtfs():
             routeList[route_id]["stops"][bound][row["stop_sequence"]] = row["stop_id"]
 
     # parse fares
+    _FareRec = namedtuple("_FareRec", ["on_seq", "off_seq", "price"])
+    _fare_records = {}
     with open(primary_dir / "fare_attributes.txt", "r", encoding="UTF-8") as f:
         for row in csv.DictReader(f):
             [route_id, bound, on, off] = row["fare_id"].split("-")
-            price = row["price"]
-            if bound not in routeList[route_id]["fares"]:
-                routeList[route_id]["fares"][bound] = {}
-            if on not in routeList[route_id]["fares"][bound] or routeList[route_id][
-                "fares"
-            ][bound][on][1] < int(off):
-                routeList[route_id]["fares"][bound][on] = (
-                    "0" if price == "0.0000" else price,
-                    int(off),
-                )
+            _fare_records.setdefault((route_id, bound), []).append(
+                _FareRec(int(on), int(off), row["price"])
+            )
+
+    for (route_id, bound), records in _fare_records.items():
+        sections, groups = compress_fares(records)
+        routeList[route_id]["fares"][bound] = fares_to_csv(sections, groups)
 
     for route_id in routeList.keys():
         for bound in routeList[route_id]["stops"].keys():
             _tmp = list(routeList[route_id]["stops"][bound].items())
             _tmp.sort(key=takeFirst)
             routeList[route_id]["stops"][bound] = [v for k, v in _tmp]
-        for bound in routeList[route_id]["fares"].keys():
-            _tmp = list(routeList[route_id]["fares"][bound].items())
-            _tmp.sort(key=takeFirst)
-            routeList[route_id]["fares"][bound] = [v[0] for k, v in _tmp]
 
     # TODO: understand what is nameReg
     nameReg = re.compile("\\[(.*)\\] (.*)")
