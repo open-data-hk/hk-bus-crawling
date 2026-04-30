@@ -9,22 +9,25 @@ def isNameMatch(name_a, name_b):
     return tmp_a.find(tmp_b) >= 0 or tmp_b.find(tmp_a) >= 0
 
 
+def _time_to_min(t):
+    return int(t[:2]) * 60 + int(t[2:4])
+
+
 def countBus(freq):
     if freq is None:
         return 0
-    sum = 0
-    for entries in freq.values():
-        for startTime, v in entries.items():
-            if v is None:
-                sum += 1
-                continue
-            endTime, waitTime = v
-            sum += int(
-                (int(endTime[0:2]) - int(startTime[0:2])) * 60
-                + int(endTime[2:4])
-                - int(startTime[2:4])
-            ) / (int(waitTime) / 60)
-    return sum
+    total = 0
+    for s in freq.values():
+        tokens = s.split("|")
+        for i, token in enumerate(tokens):
+            if "," in token:
+                start, headway = token.split(",")
+                if i + 1 < len(tokens):
+                    end = tokens[i + 1].split(",")[0]
+                    total += (_time_to_min(end) - _time_to_min(start)) / int(headway)
+            elif i == 0 or "," not in tokens[i - 1]:
+                total += 1
+    return total
 
 
 def cleansing(co):
