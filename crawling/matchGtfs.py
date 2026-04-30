@@ -1,6 +1,7 @@
 import json
 import sys
 
+from gtfs_fare import get_fare
 from haversine import haversine
 from utils import DATA_DIR
 
@@ -156,17 +157,22 @@ def matchRoutes(co):
         if co == "gmb" and co in gtfsRoute["co"]:  # handle for gmb
             for route in routeList:
                 if route["gtfsId"] == gtfsId:
-                    route["fares"] = [
-                        gtfsRoute["fares"]["1"][0]
-                        for i in range(len(route["stops"]) - 1)
-                    ]
+                    # it assumes fare of all stops are the same
+                    # TODO: inspect the validity of data
+                    # there should be sectional fare
+                    flat_fare = get_fare(
+                        gtfsRoute["fares"]["1"], 1, len(gtfsRoute["stops"]["1"])
+                    )
+                    route["fares"] = [flat_fare for _ in range(len(route["stops"]) - 1)]
         elif (co == "sunferry" or co == "fortuneferry") and "ferry" in gtfsRoute["co"]:
             for route in routeList:
                 if route["gtfsId"] == gtfsId:
-                    route["fares"] = [
-                        gtfsRoute["fares"]["1"][0]
-                        for i in range(len(route["stops"]) - 1)
-                    ]
+                    # it assumes fare of all stops are the same
+                    # TODO: inspect the validity of data
+                    flat_fare = get_fare(
+                        gtfsRoute["fares"]["1"], 1, len(gtfsRoute["stops"]["1"])
+                    )
+                    route["fares"] = [flat_fare for _ in range(len(route["stops"]) - 1)]
         # handle for other companies
         elif co in gtfsRoute["co"] or (co == "hkkf" and "ferry" in gtfsRoute["co"]):
             for bound, stops in gtfsRoute["stops"].items():
@@ -211,9 +217,13 @@ def matchRoutes(co):
                         and "gtfs" not in route
                         and "virtual" not in route
                     ):
+                        _fare_csv = gtfsRoute["fares"].get(bound, "")
                         routeCandidate["fares"] = (
-                            [gtfsRoute["fares"][bound][i] for i, j in ret[:-1]]
-                            if len(ret[:-1]) < len(gtfsRoute["fares"][bound]) + 1
+                            [
+                                get_fare(_fare_csv, i + 1, ret[-1][0] + 1)
+                                for i, _ in ret[:-1]
+                            ]
+                            if _fare_csv
                             else None
                         )
                         routeCandidate["freq"] = gtfsRoute["freq"][bound]
@@ -228,9 +238,13 @@ def matchRoutes(co):
                         route["found"] = True
                     else:
                         routeCandidate["stops"] = [route["stops"][j] for i, j in ret]
+                        _fare_csv = gtfsRoute["fares"].get(bound, "")
                         routeCandidate["fares"] = (
-                            [gtfsRoute["fares"][bound][i] for i, j in ret[:-1]]
-                            if len(ret[:-1]) < len(gtfsRoute["fares"][bound]) + 1
+                            [
+                                get_fare(_fare_csv, i + 1, ret[-1][0] + 1)
+                                for i, _ in ret[:-1]
+                            ]
+                            if _fare_csv
                             else None
                         )
                         routeCandidate["freq"] = gtfsRoute["freq"][bound]
