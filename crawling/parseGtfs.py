@@ -46,6 +46,31 @@ def takeFirst(elem):
     return int(elem[0])
 
 
+def compress_freq_entries(entries: dict) -> str:
+    parts = []
+    prev_freq_end = None
+
+    for start in sorted(entries.keys()):
+        val = entries[start]
+
+        if val is None:
+            if prev_freq_end is not None and prev_freq_end != start:
+                parts.append(prev_freq_end)
+            prev_freq_end = None
+            parts.append(start)
+        else:
+            end_time, headway_secs = val
+            if prev_freq_end is not None and prev_freq_end != start:
+                parts.append(prev_freq_end)
+            parts.append(f"{start},{int(headway_secs) // 60}")
+            prev_freq_end = end_time
+
+    if prev_freq_end is not None:
+        parts.append(prev_freq_end)
+
+    return "|".join(parts)
+
+
 def orig_dest(
     route_long_name: str, lang: Literal["tc", "sc", "en"]
 ) -> tuple[dict, dict]:
@@ -144,6 +169,7 @@ async def parseGtfs():
             if start_time not in routeList[route_id]["freq"][bound][calendar]:
                 routeList[route_id]["freq"][bound][calendar][start_time] = None
 
+    # trips.txt is required because not all trips have frequency
     with open(primary_dir / "frequencies.txt", "r", encoding="UTF-8") as f:
         for row in csv.DictReader(f):
             [route_id, bound, calendar, start_time] = row["trip_id"].split("-")
@@ -151,6 +177,14 @@ async def parseGtfs():
                 row["end_time"][0:5].replace(":", ""),
                 row["headway_secs"],
             )
+
+    for route_id in routeList:
+        for bound in routeList[route_id]["freq"]:
+            for calendar in routeList[route_id]["freq"][bound]:
+                entries = routeList[route_id]["freq"][bound][calendar]
+                routeList[route_id]["freq"][bound][calendar] = compress_freq_entries(
+                    entries
+                )
 
     # parse stop seq
     with open(primary_dir / "stop_times.txt", "r", encoding="UTF-8") as f:
