@@ -398,8 +398,15 @@ def match_co_routes_with_gtfs(co: str) -> None:
     route_candidates = []
     # one pass to find matches of co vs gtfs by DP
     for gtfs_id, gtfs_route in gtfs_routes.items():
+        # "co" of ferry services in gtfs are all "ferry"
+        # convert ferry company codes as "ferry" when matching with gtfs
+        gtfs_co = co if co not in FERRY_COS else "ferry"
+        # skip matching if co not match
+        if gtfs_co not in gtfs_route["co"]:
+            continue
+
         debug = False and gtfs_id == "1047" and gtfs_route["orig"]["tc"] == "沙田站"
-        if co == "gmb" and co in gtfs_route["co"]:  # handle for gmb
+        if co == "gmb":  # handle for gmb
             for co_route in co_routes:
                 if co_route["gtfsId"] == gtfs_id:
                     # it assumes fare of all stops are the same
@@ -411,7 +418,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
                     co_route["fares"] = [
                         flat_fare for _ in range(len(co_route["stops"]) - 1)
                     ]
-        elif (co == "sunferry" or co == "fortuneferry") and "ferry" in gtfs_route["co"]:
+        elif co in ["sunferry", "fortuneferry"]:
             for co_route in co_routes:
                 if co_route["gtfsId"] == gtfs_id:
                     # it assumes fare of all stops are the same
@@ -423,7 +430,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
                         flat_fare for _ in range(len(co_route["stops"]) - 1)
                     ]
         # handle for other companies
-        elif co in gtfs_route["co"] or (co == "hkkf" and "ferry" in gtfs_route["co"]):
+        else:
             for route_seq, gtfs_route_seq_stops in gtfs_route["stops"].items():
                 best_match: BestMatch = ("-1", INFINITY_DIST, [], "", [], {})
                 for co_route in co_routes + getVirtualCircularRoutes(
