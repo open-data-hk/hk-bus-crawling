@@ -13,8 +13,8 @@ DIST_DIFF = 600
 
 with open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8") as f:
     gtfs = json.load(f)
-    gtfsRoutes = gtfs["routeList"]
-    gtfsStops = gtfs["stopList"]
+    gtfs_routes = gtfs["routeList"]
+    gtfs_stops = gtfs["stopList"]
 
 
 class CoStop(TypedDict):
@@ -105,8 +105,8 @@ def isNameMatch(name_a: str, name_b: str) -> bool:
 
 
 def matchStopsByDp(
-    coStops: list[CoStop],
-    gtfsStops: list[GtfsStop],
+    co_stops: list[CoStop],
+    gtfs_stops: list[GtfsStop],
     co: str,
     debug: bool = False,
 ) -> tuple[list[StopMatch], float]:
@@ -155,30 +155,30 @@ def matchStopsByDp(
     """
     if co in FERRY_COS:
         co = "ferry"
-    if len(gtfsStops) > len(coStops) + 1:
+    if len(gtfs_stops) > len(co_stops) + 1:
         return [], INFINITY_DIST
-    if len(gtfsStops) - len(coStops) == 1:
-        gtfsStops = gtfsStops[:-1]
+    if len(gtfs_stops) - len(co_stops) == 1:
+        gtfs_stops = gtfs_stops[:-1]
 
     # initialization
     distSum = [
-        [INFINITY_DIST for x in range(len(coStops) + 1)]
-        for y in range(len(gtfsStops) + 1)
+        [INFINITY_DIST for x in range(len(co_stops) + 1)]
+        for y in range(len(gtfs_stops) + 1)
     ]
-    for j in range(len(coStops) - len(gtfsStops) + 1):
+    for j in range(len(co_stops) - len(gtfs_stops) + 1):
         distSum[0][j] = 0
 
     # Perform DP
-    for i in range(len(gtfsStops)):
-        gtfsStop = gtfsStops[i]
-        for j in range(len(coStops)):
-            coStop = coStops[j]
+    for i in range(len(gtfs_stops)):
+        gtfs_stop = gtfs_stops[i]
+        for j in range(len(co_stops)):
+            co_stop = co_stops[j]
             dist = (
                 0
-                if coStop["name_tc"] == gtfsStop["stopName"][co]["tc"]
+                if co_stop["name_tc"] == gtfs_stop["stopName"][co]["tc"]
                 else haversine(
-                    (float(coStop["lat"]), float(coStop["long"])),
-                    (gtfsStop["lat"], gtfsStop["lng"]),
+                    (float(co_stop["lat"]), float(co_stop["long"])),
+                    (gtfs_stop["lat"], gtfs_stop["lng"]),
                 )
                 * 1000
             )
@@ -189,12 +189,12 @@ def matchStopsByDp(
             )
 
     # fast return if no good result
-    if not min(distSum[len(gtfsStops)]) / len(gtfsStops) < DIST_DIFF:
+    if not min(distSum[len(gtfs_stops)]) / len(gtfs_stops) < DIST_DIFF:
         return [], INFINITY_DIST
 
     # backtracking
-    i = len(gtfsStops)
-    j = len(coStops)
+    i = len(gtfs_stops)
+    j = len(co_stops)
     ret: list[StopMatch] = []
     while i > 0 and j > 0:
         if distSum[i][j] == distSum[i][j - 1]:
@@ -208,7 +208,7 @@ def matchStopsByDp(
     # penalty distance is given for not exact match route
     penalty = sum([abs(a - b) for a, b in ret]) * 0.01
 
-    return ret, min(distSum[len(gtfsStops)]) / len(gtfsStops) + penalty
+    return ret, min(distSum[len(gtfs_stops)]) / len(gtfs_stops) + penalty
 
 
 def mergeRouteAsCircularRoute(routeA: Route, routeB: Route) -> Route:
@@ -299,8 +299,8 @@ def getVirtualCircularRoutes(routeList: list[Route], routeNo: str) -> list[Route
 
 def printStopMatches(
     bestMatch: BestMatchTuple,
-    gtfsStops: dict[str, GtfsStop],
-    stopList: dict[str, CoStop],
+    gtfs_stops: dict[str, GtfsStop],
+    co_stops: dict[str, CoStop],
     co: str,
 ) -> None:
     """Print a side-by-side comparison of GTFS and operator stop names for a match.
@@ -335,16 +335,16 @@ def printStopMatches(
                 str(idx + 1)
                 + "  "
                 + "\t|\t".join(
-                    [gtfsStops[gtfsId]["stopName"][co], stopList[stopId]["name_tc"]]
+                    [gtfs_stops[gtfs_id]["stopName"][co], co_stops[stop_id]["name_tc"]]
                 )
-                for idx, (gtfsId, stopId) in enumerate(stopPair)
+                for idx, (gtfs_id, stop_id) in enumerate(stopPair)
             ]
         )
     )
     print()
 
 
-def matchRoutes(co: str) -> None:
+def match_co_routes_with_gtfs(co: str) -> None:
     """Match and enrich one operator's routes with GTFS fares, frequencies, and aligned stops.
 
     Important: This is the main pipeline step that bridges per-operator crawled
@@ -388,79 +388,98 @@ def matchRoutes(co: str) -> None:
     """
     print(co)
     with open(DATA_DIR / ("routeList.%s.json" % co), "r", encoding="utf-8") as f:
-        routeList = json.load(f)
+        co_routes = json.load(f)
     with open(DATA_DIR / ("stopList.%s.json" % co), "r", encoding="utf-8") as f:
-        stopList = json.load(f)
+        co_stops = json.load(f)
 
-    routeCandidates = []
+    route_candidates = []
     # one pass to find matches of co vs gtfs by DP
-    for gtfsId, gtfsRoute in gtfsRoutes.items():
-        debug = False and gtfsId == "1047" and gtfsRoute["orig"]["tc"] == "沙田站"
-        if co == "gmb" and co in gtfsRoute["co"]:  # handle for gmb
-            for route in routeList:
-                if route["gtfsId"] == gtfsId:
+    for gtfs_id, gtfs_route in gtfs_routes.items():
+        debug = False and gtfs_id == "1047" and gtfs_route["orig"]["tc"] == "沙田站"
+        if co == "gmb" and co in gtfs_route["co"]:  # handle for gmb
+            for co_route in co_routes:
+                if co_route["gtfsId"] == gtfs_id:
                     # it assumes fare of all stops are the same
                     # TODO: inspect the validity of data
                     # there should be sectional fare
                     flat_fare = get_fare(
-                        gtfsRoute["fares"]["1"], 1, len(gtfsRoute["stops"]["1"])
+                        gtfs_route["fares"]["1"], 1, len(gtfs_route["stops"]["1"])
                     )
-                    route["fares"] = [flat_fare for _ in range(len(route["stops"]) - 1)]
-        elif (co == "sunferry" or co == "fortuneferry") and "ferry" in gtfsRoute["co"]:
-            for route in routeList:
-                if route["gtfsId"] == gtfsId:
+                    co_route["fares"] = [
+                        flat_fare for _ in range(len(co_route["stops"]) - 1)
+                    ]
+        elif (co == "sunferry" or co == "fortuneferry") and "ferry" in gtfs_route["co"]:
+            for co_route in co_routes:
+                if co_route["gtfsId"] == gtfs_id:
                     # it assumes fare of all stops are the same
                     # TODO: inspect the validity of data
                     flat_fare = get_fare(
-                        gtfsRoute["fares"]["1"], 1, len(gtfsRoute["stops"]["1"])
+                        gtfs_route["fares"]["1"], 1, len(gtfs_route["stops"]["1"])
                     )
-                    route["fares"] = [flat_fare for _ in range(len(route["stops"]) - 1)]
+                    co_route["fares"] = [
+                        flat_fare for _ in range(len(co_route["stops"]) - 1)
+                    ]
         # handle for other companies
-        elif co in gtfsRoute["co"] or (co == "hkkf" and "ferry" in gtfsRoute["co"]):
-            for bound, stops in gtfsRoute["stops"].items():
-                bestMatch: Any = (-1, INFINITY_DIST)
-                for route in routeList + getVirtualCircularRoutes(
-                    routeList, gtfsRoute["route"]
+        elif co in gtfs_route["co"] or (co == "hkkf" and "ferry" in gtfs_route["co"]):
+            for route_seq, gtfs_route_seq_stops in gtfs_route["stops"].items():
+                best_match: Any = (-1, INFINITY_DIST)
+                for co_route in co_routes + getVirtualCircularRoutes(
+                    co_routes, gtfs_route["route"]
                 ):
                     if (
-                        co in gtfsRoute["co"] and route["route"] == gtfsRoute["route"]
+                        co in gtfs_route["co"]
+                        and co_route["route"] == gtfs_route["route"]
                     ) or (
                         co == "hkkf"
                         and (
                             (
-                                route["orig_tc"].startswith(gtfsRoute["orig"]["tc"])
-                                and route["dest_tc"].startswith(gtfsRoute["dest"]["tc"])
+                                co_route["orig_tc"].startswith(gtfs_route["orig"]["tc"])
+                                and co_route["dest_tc"].startswith(
+                                    gtfs_route["dest"]["tc"]
+                                )
                             )
                             or (
-                                route["orig_tc"].startswith(gtfsRoute["dest"]["tc"])
-                                and route["dest_tc"].startswith(gtfsRoute["orig"]["tc"])
+                                co_route["orig_tc"].startswith(gtfs_route["dest"]["tc"])
+                                and co_route["dest_tc"].startswith(
+                                    gtfs_route["orig"]["tc"]
+                                )
                             )
                         )
                     ):
                         ret, avgDist = matchStopsByDp(
-                            [stopList[stop] for stop in route["stops"]],
-                            [gtfsStops[stop] for stop in stops],
+                            [co_stops[co_stop_id] for co_stop_id in co_route["stops"]],
+                            [
+                                gtfs_stops[gtfs_stop_id]
+                                for gtfs_stop_id in gtfs_route_seq_stops
+                            ],
                             co,
                             debug,
                         )
-                        if avgDist < bestMatch[1]:
-                            bestMatch = (gtfsId, avgDist, ret, bound, stops, route)
+                        if avgDist < best_match[1]:
+                            best_match = (
+                                gtfs_id,
+                                avgDist,
+                                ret,
+                                route_seq,
+                                gtfs_route_seq_stops,
+                                co_route,
+                            )
 
                 # assume matching to be avg stop distance diff is lower than 100
-                if bestMatch[1] < DIST_DIFF:
-                    ret, bound, stops, route = bestMatch[2:]
+                if best_match[1] < DIST_DIFF:
+                    ret, route_seq, gtfs_route_seq_stops, co_route = best_match[2:]
 
-                    routeCandidate = route.copy()
+                    route_candidate = co_route.copy()
                     if (
                         (
-                            len(ret) == len(route["stops"])
-                            or len(ret) + 1 == len(route["stops"])
+                            len(ret) == len(co_route["stops"])
+                            or len(ret) + 1 == len(co_route["stops"])
                         )
-                        and "gtfs" not in route
-                        and "virtual" not in route
+                        and "gtfs" not in co_route
+                        and "virtual" not in co_route
                     ):
-                        _fare_csv = gtfsRoute["fares"].get(bound, "")
-                        routeCandidate["fares"] = (
+                        _fare_csv = gtfs_route["fares"].get(route_seq, "")
+                        route_candidate["fares"] = (
                             [
                                 get_fare(_fare_csv, i + 1, ret[-1][0] + 1)
                                 for i, _ in ret[:-1]
@@ -468,20 +487,24 @@ def matchRoutes(co: str) -> None:
                             if _fare_csv
                             else None
                         )
-                        routeCandidate["freq"] = gtfsRoute["freq"][bound]
-                        routeCandidate["jt"] = gtfsRoute["jt"]
-                        routeCandidate["co"] = (
-                            gtfsRoute["co"]
-                            if co in gtfsRoute["co"]
-                            else (gtfsRoute["co"] + [co])
+                        route_candidate["freq"] = gtfs_route["freq"][route_seq]
+                        route_candidate["jt"] = gtfs_route["jt"]
+                        route_candidate["co"] = (
+                            gtfs_route["co"]
+                            if co in gtfs_route["co"]
+                            else (gtfs_route["co"] + [co])
                         )
-                        routeCandidate["stops"] = [route["stops"][j] for i, j in ret]
-                        routeCandidate["gtfs"] = [gtfsId]
-                        route["found"] = True
+                        route_candidate["stops"] = [
+                            co_route["stops"][j] for i, j in ret
+                        ]
+                        route_candidate["gtfs"] = [gtfs_id]
+                        co_route["found"] = True
                     else:
-                        routeCandidate["stops"] = [route["stops"][j] for i, j in ret]
-                        _fare_csv = gtfsRoute["fares"].get(bound, "")
-                        routeCandidate["fares"] = (
+                        route_candidate["stops"] = [
+                            co_route["stops"][j] for i, j in ret
+                        ]
+                        _fare_csv = gtfs_route["fares"].get(route_seq, "")
+                        route_candidate["fares"] = (
                             [
                                 get_fare(_fare_csv, i + 1, ret[-1][0] + 1)
                                 for i, _ in ret[:-1]
@@ -489,71 +512,71 @@ def matchRoutes(co: str) -> None:
                             if _fare_csv
                             else None
                         )
-                        routeCandidate["freq"] = gtfsRoute["freq"][bound]
-                        routeCandidate["jt"] = gtfsRoute["jt"]
-                        routeCandidate["co"] = gtfsRoute["co"]
-                        routeCandidate["orig_tc"] = stopList[
-                            routeCandidate["stops"][0]
+                        route_candidate["freq"] = gtfs_route["freq"][route_seq]
+                        route_candidate["jt"] = gtfs_route["jt"]
+                        route_candidate["co"] = gtfs_route["co"]
+                        route_candidate["orig_tc"] = co_stops[
+                            route_candidate["stops"][0]
                         ]["name_tc"]
-                        routeCandidate["orig_en"] = stopList[
-                            routeCandidate["stops"][0]
+                        route_candidate["orig_en"] = co_stops[
+                            route_candidate["stops"][0]
                         ]["name_en"]
-                        routeCandidate["dest_tc"] = stopList[
-                            routeCandidate["stops"][-1]
+                        route_candidate["dest_tc"] = co_stops[
+                            route_candidate["stops"][-1]
                         ]["name_tc"]
-                        routeCandidate["dest_en"] = stopList[
-                            routeCandidate["stops"][-1]
+                        route_candidate["dest_en"] = co_stops[
+                            route_candidate["stops"][-1]
                         ]["name_en"]
-                        routeCandidate["service_type"] = (
-                            "2" if "found" in route else "1"
+                        route_candidate["service_type"] = (
+                            "2" if "found" in co_route else "1"
                         )
-                        routeCandidate["gtfs"] = [gtfsId]
+                        route_candidate["gtfs"] = [gtfs_id]
                         # mark the route has mapped to GTFS, mainly for ctb routes
-                        route["found"] = True
-                    routeCandidates.append(routeCandidate)
-                    if "_route" not in gtfsRoute:
-                        gtfsRoute["_route"] = {}
-                    gtfsRoute["_route"][co] = route.copy()
-                elif co in gtfsRoute["co"]:
+                        co_route["found"] = True
+                    route_candidates.append(route_candidate)
+                    if "_route" not in gtfs_route:
+                        gtfs_route["_route"] = {}
+                    gtfs_route["_route"][co] = co_route.copy()
+                elif co in gtfs_route["co"]:
                     print(
                         co,
-                        gtfsRoute["route"],
+                        gtfs_route["route"],
                         "cannot match any in GTFS",
                         file=sys.stderr,
                     )
 
-    for route in routeList:
-        if "gtfs" not in route:
-            route["co"] = [co]
+    for co_route in co_routes:
+        if "gtfs" not in co_route:
+            co_route["co"] = [co]
 
     print(
         co,
-        len([route for route in routeList if "gtfs" not in route]),
+        len([route for route in co_routes if "gtfs" not in route]),
         "out of",
-        len(routeList),
+        len(co_routes),
         "not match",
     )
     if co != "mtr":
-        routeList.extend(routeCandidates)
+        co_routes.extend(route_candidates)
     # skipping routes that just partially mapped to GTFS
-    routeList = [
-        route for route in routeList if "found" not in route or "fares" in route
+    co_routes = [
+        route for route in co_routes if "found" not in route or "fares" in route
     ]
 
     with open(DATA_DIR / ("routeFareList.%s.json" % co), "w", encoding="UTF-8") as f:
-        f.write(json.dumps(routeList, ensure_ascii=False))
+        f.write(json.dumps(co_routes, ensure_ascii=False))
 
 
-matchRoutes("kmb")
-matchRoutes("ctb")
-matchRoutes("nlb")
-matchRoutes("lrtfeeder")
-matchRoutes("gmb")
-matchRoutes("lightRail")
-matchRoutes("mtr")
-matchRoutes("sunferry")
-matchRoutes("fortuneferry")
-matchRoutes("hkkf")
+match_co_routes_with_gtfs("kmb")
+match_co_routes_with_gtfs("ctb")
+match_co_routes_with_gtfs("nlb")
+match_co_routes_with_gtfs("lrtfeeder")
+match_co_routes_with_gtfs("gmb")
+match_co_routes_with_gtfs("lightRail")
+match_co_routes_with_gtfs("mtr")
+match_co_routes_with_gtfs("sunferry")
+match_co_routes_with_gtfs("fortuneferry")
+match_co_routes_with_gtfs("hkkf")
 
 """
 for routeId, route in gtfsRoutes.items():
@@ -565,4 +588,4 @@ routeFareList = {}
 
 
 with open(DATA_DIR / "routeGtfs.all.json", "w", encoding="UTF-8") as f:
-    f.write(json.dumps(gtfsRoutes, ensure_ascii=False))
+    f.write(json.dumps(gtfs_routes, ensure_ascii=False))
