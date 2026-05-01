@@ -160,19 +160,30 @@ def matchStopsByDp(
     if len(gtfs_stops) - len(co_stops) == 1:
         gtfs_stops = gtfs_stops[:-1]
 
-    # initialization
+    # initialization: 2D list
+    # co_stops: horizontal (x), gtfs_stops: vertical (y)
+    #     c0 c1 c2 c3 ...
+    # g0   i  i  i  i
+    # g1   i  i  i  i
+    # g2   i  i  i  i
+    # .
     distSum = [
         [INFINITY_DIST for x in range(len(co_stops) + 1)]
         for y in range(len(gtfs_stops) + 1)
     ]
+    # distSum is "1-index", set the first n element of the first row as 0
     for j in range(len(co_stops) - len(gtfs_stops) + 1):
         distSum[0][j] = 0
+    #     c0 c1 c2 c3
+    # g0   0  0  i  i
+    # g1   i  i  i  i
+    # g2   i  i  i  i
 
     # Perform DP
-    for i in range(len(gtfs_stops)):
-        gtfs_stop = gtfs_stops[i]
-        for j in range(len(co_stops)):
-            co_stop = co_stops[j]
+    for i, gtfs_stop in enumerate(gtfs_stops):
+        for j, co_stop in enumerate(co_stops):
+            # if chinese name exactly match, score 0
+            # else calculate distance of two stops in meter as score
             dist = (
                 0
                 if co_stop["name_tc"] == gtfs_stop["stopName"][co]["tc"]
@@ -183,13 +194,30 @@ def matchStopsByDp(
                 * 1000
             )
 
+            # the first gtfs_stop and first co_stop
+            #     c0 c1 c2 c3
+            # g0   0  0  i  i
+            # g1   i  d  i  i
+            # g2   i  i  i  i
+            # d =  min((0 + dist), i) = dist
             distSum[i + 1][j + 1] = min(
                 distSum[i][j] + dist,  # from previous stops of both sides
                 distSum[i + 1][j],  # skipping current coStops
             )
+            # the first row and first column never change
+
+            # After iteratation of all co_stops in the first gtfs_stop
+            #     c0 c1 c2 c3 ...
+            # g0   0  0  i  i
+            # g1   i  d  d  d
+            # g2   i  i  e  e
+            # e = d + dist
 
     # fast return if no good result
-    if not min(distSum[len(gtfs_stops)]) / len(gtfs_stops) < DIST_DIFF:
+    cumulative_dist = min(distSum[len(gtfs_stops)])  # min val in the last row
+    avg_dist = cumulative_dist / len(gtfs_stops)
+    # average distance per stop more than DIST_DIFF (600m) is not ideal
+    if not avg_dist < DIST_DIFF:
         return [], INFINITY_DIST
 
     # backtracking
@@ -208,7 +236,7 @@ def matchStopsByDp(
     # penalty distance is given for not exact match route
     penalty = sum([abs(a - b) for a, b in ret]) * 0.01
 
-    return ret, min(distSum[len(gtfs_stops)]) / len(gtfs_stops) + penalty
+    return ret, avg_dist + penalty
 
 
 def mergeRouteAsCircularRoute(routeA: Route, routeB: Route) -> Route:
