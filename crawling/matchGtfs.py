@@ -64,7 +64,7 @@ class Route(TypedDict, total=False):
 StopMatch = tuple[int, int]
 
 # Full best-match tuple: (gtfsId, avgDist, stopPairs, bound, gtfsStopIds, route)
-BestMatchTuple = tuple[str, float, list[StopMatch], str, list[str], Route]
+BestMatch = tuple[str, float, list[StopMatch], str, list[str], Route]
 
 # GTFS uses "ferry" as the operator code for all ferry companies.
 FERRY_COS: set[str] = {"hkkf"}
@@ -298,7 +298,7 @@ def getVirtualCircularRoutes(routeList: list[Route], routeNo: str) -> list[Route
 
 
 def printStopMatches(
-    bestMatch: BestMatchTuple,
+    best_match: BestMatch,
     gtfs_stops: dict[str, GtfsStop],
     co_stops: dict[str, CoStop],
     co: str,
@@ -310,7 +310,7 @@ def printStopMatches(
     data sources alongside the match score and bound direction.
 
     Args:
-        bestMatch: The best-match 6-tuple from the route-matching loop:
+        best_match: The best-match 6-tuple from the route-matching loop:
             ``(gtfsId, avgDist, stopIndexPairs, bound, gtfsStopIds, route)``.
         gtfsStops: Full GTFS stop dictionary keyed by stop ID.
         stopList: Operator stop dictionary keyed by stop ID.
@@ -323,11 +323,14 @@ def printStopMatches(
         1  沙田站               |   沙田市中心
         2  大圍站               |   大圍
     """
+
+    gtfsId, avgDist, stopIndexPairs, bound, gtfsStopIds, route = best_match
+
     stopPair = [
-        (bestMatch[4][gtfsStopIdx], bestMatch[5]["stops"][routeStopIdx])
-        for gtfsStopIdx, routeStopIdx in bestMatch[2]
+        (gtfsStopIds[gtfsStopIdx], route["stops"][routeStopIdx])
+        for gtfsStopIdx, routeStopIdx in stopIndexPairs
     ]
-    print(bestMatch[3], bestMatch[0], bestMatch[1])
+    print(bound, gtfsId, avgDist)
     print("\t|\t".join(["運輸處", co]))
     print(
         "\n".join(
@@ -422,7 +425,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
         # handle for other companies
         elif co in gtfs_route["co"] or (co == "hkkf" and "ferry" in gtfs_route["co"]):
             for route_seq, gtfs_route_seq_stops in gtfs_route["stops"].items():
-                best_match: Any = (-1, INFINITY_DIST)
+                best_match: BestMatch = ("-1", INFINITY_DIST, [], "", [], {})
                 for co_route in co_routes + getVirtualCircularRoutes(
                     co_routes, gtfs_route["route"]
                 ):
@@ -455,7 +458,8 @@ def match_co_routes_with_gtfs(co: str) -> None:
                             co,
                             debug,
                         )
-                        if avgDist < best_match[1]:
+                        best_match_avgDist = best_match[1]
+                        if avgDist < best_match_avgDist:
                             best_match = (
                                 gtfs_id,
                                 avgDist,
@@ -466,8 +470,10 @@ def match_co_routes_with_gtfs(co: str) -> None:
                             )
 
                 # assume matching to be avg stop distance diff is lower than 100
-                if best_match[1] < DIST_DIFF:
-                    ret, route_seq, gtfs_route_seq_stops, co_route = best_match[2:]
+
+                best_match_avgDist = best_match[1]
+                if best_match_avgDist < DIST_DIFF:
+                    _, _, ret, route_seq, gtfs_route_seq_stops, co_route = best_match
 
                     route_candidate = co_route.copy()
                     if (
