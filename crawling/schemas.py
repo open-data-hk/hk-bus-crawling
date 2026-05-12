@@ -31,9 +31,12 @@ class ProviderRoute(TypedDict):
     dest_tc: str
     dest_sc: str
     stops: list[str]
+    id: NotRequired[str]
     service_type: NotRequired[int | str]
     gtfs_id: NotRequired[str]
     freq: NotRequired[dict[str, Any]]
+    fares: NotRequired[list[str | float]]
+    faresHoliday: NotRequired[list[str | float]]
 
 
 class ProviderStop(TypedDict):
