@@ -7,6 +7,18 @@ from utils import DATA_DIR
 routeList = []
 stopList = {}
 stopMap = {}
+PROVIDERS = [
+    "kmb",
+    "ctb",
+    "nlb",
+    "lrtfeeder",
+    "gmb",
+    "lightRail",
+    "mtr",
+    "sunferry",
+    "fortuneferry",
+    "hkkf",
+]
 
 
 def getRouteObj(
@@ -204,16 +216,9 @@ def standardizeDict(d):
 def main():
     global routeList
 
-    importRouteListJson("kmb")
-    importRouteListJson("ctb")
-    importRouteListJson("nlb")
-    importRouteListJson("lrtfeeder")
-    importRouteListJson("gmb")
-    importRouteListJson("lightRail")
-    importRouteListJson("mtr")
-    importRouteListJson("sunferry")
-    importRouteListJson("fortuneferry")
-    importRouteListJson("hkkf")
+    for co in PROVIDERS:
+        importRouteListJson(co)
+
     routeList = smartUnique()
     for route in routeList:
         route["stops"] = {co: stops for co, stops in route["stops"]}
