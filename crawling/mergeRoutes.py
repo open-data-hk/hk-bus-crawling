@@ -74,84 +74,89 @@ def isGtfsMatch(knownRoute, newRoute):
     return knownRoute["gtfsId"] in newRoute["gtfs"]
 
 
-def importRouteListJson(co, route_list, stop_list):
-    _routeList = loadJson(DATA_DIR / f"routeFareList.{co}.cleansed.json")
-    _stopList = loadJson(DATA_DIR / f"stopList.{co}.json")
-    for stopId, stop in _stopList.items():
-        if stopId not in stop_list:
+def importRouteListJson(co, whole_route_list, whole_stop_list):
+    co_route_list = loadJson(DATA_DIR / f"routeFareList.{co}.cleansed.json")
+    co_stop_list = loadJson(DATA_DIR / f"stopList.{co}.json")
+    for co_stop_id, co_stop in co_stop_list.items():
+        if co_stop_id not in whole_stop_list:
             try:
-                stop_list[stopId] = {
-                    "name": {"en": stop["name_en"], "tc": stop["name_tc"]},
-                    "location": {"lat": float(stop["lat"]), "lng": float(stop["lng"])},
+                whole_stop_list[co_stop_id] = {
+                    "name": {"en": co_stop["name_en"], "tc": co_stop["name_tc"]},
+                    "location": {
+                        "lat": float(co_stop["lat"]),
+                        "lng": float(co_stop["lng"]),
+                    },
                 }
             except BaseException:
-                print("Problematic stop: ", stopId, file=stderr)
+                print("Problematic stop: ", co_stop_id, file=stderr)
 
-    for _route in _routeList:
+    for co_route in co_route_list:
         found = False
         special_type = 1
         orig = {
-            "en": _route["orig_en"].replace("/", "／"),
-            "tc": _route["orig_tc"].replace("/", "／"),
+            "en": co_route["orig_en"].replace("/", "／"),
+            "tc": co_route["orig_tc"].replace("/", "／"),
         }
         dest = {
-            "en": _route["dest_en"].replace("/", "／"),
-            "tc": _route["dest_tc"].replace("/", "／"),
+            "en": co_route["dest_en"].replace("/", "／"),
+            "tc": co_route["dest_tc"].replace("/", "／"),
         }
 
-        for route in route_list:
+        for w_route in whole_route_list:
             if (
-                _route["route"] == route["route"]
-                and co in route["co"]
-                and isGtfsMatch(route, _route)
+                co_route["route"] == w_route["route"]
+                and co in w_route["co"]
+                and isGtfsMatch(w_route, co_route)
             ):
                 # skip checking if the bound is not the same
-                if co in route["bound"] and route["bound"][co] != _route["bound"]:
+                if co in w_route["bound"] and w_route["bound"][co] != co_route["bound"]:
                     continue
 
-                if len(_route["stops"]) == route["seq"]:
+                if len(co_route["stops"]) == w_route["seq"]:
                     dist = 0
                     merge = True
-                    for stop_a, stop_b in zip(_route["stops"], route["stops"][0][1]):
-                        stop_a = stop_list[stop_a]
-                        stop_b = stop_list[stop_b]
+                    for co_rstop_id, w_rstop_id in zip(
+                        co_route["stops"], w_route["stops"][0][1]
+                    ):
+                        co_rstop = whole_stop_list[co_rstop_id]
+                        w_rstop = whole_stop_list[w_rstop_id]
                         dist = haversine(
-                            (stop_a["location"]["lat"], stop_a["location"]["lng"]),
-                            (stop_b["location"]["lat"], stop_b["location"]["lng"]),
+                            (co_rstop["location"]["lat"], co_rstop["location"]["lng"]),
+                            (w_rstop["location"]["lat"], w_rstop["location"]["lng"]),
                             unit=Unit.METERS,  # specify that we want distance in metres, default unit is km
                         )
                         merge = merge and dist < 300
                     if merge:
                         found = True
-                        route["stops"].append((co, _route["stops"]))
-                        route["bound"][co] = _route["bound"]
+                        w_route["stops"].append((co, co_route["stops"]))
+                        w_route["bound"][co] = co_route["bound"]
                 elif (
-                    _route["orig_en"].upper() == route["orig"]["en"].upper()
-                    and _route["dest_en"].upper() == route["dest"]["en"].upper()
+                    co_route["orig_en"].upper() == w_route["orig"]["en"].upper()
+                    and co_route["dest_en"].upper() == w_route["dest"]["en"].upper()
                 ):
-                    special_type = int(route["serviceType"]) + 1
-                    if _route["route"] == "606" and _route["dest_tc"].startswith(
+                    special_type = int(w_route["serviceType"]) + 1
+                    if co_route["route"] == "606" and co_route["dest_tc"].startswith(
                         "彩雲"
                     ):
                         print("Yes", special_type)
 
         if not found:
-            route_list.append(
+            whole_route_list.append(
                 getRouteObj(
-                    route=_route["route"],
-                    co=_route["co"],
-                    serviceType=_route.get("service_type", special_type),
-                    stops=[(co, _route["stops"])],
-                    bound={co: _route["bound"]},
+                    route=co_route["route"],
+                    co=co_route["co"],
+                    serviceType=co_route.get("service_type", special_type),
+                    stops=[(co, co_route["stops"])],
+                    bound={co: co_route["bound"]},
                     orig=orig,
                     dest=dest,
-                    fares=_route.get("fares", None),
-                    faresHoliday=_route.get("faresHoliday", None),
-                    freq=_route.get("freq", None),
-                    jt=_route.get("jt", None),
-                    nlbId=_route.get("id", None),
-                    gtfsId=_route.get("gtfs_id", _route.get("gtfs", [None])[0]),
-                    seq=len(_route["stops"]),
+                    fares=co_route.get("fares", None),
+                    faresHoliday=co_route.get("faresHoliday", None),
+                    freq=co_route.get("freq", None),
+                    jt=co_route.get("jt", None),
+                    nlbId=co_route.get("id", None),
+                    gtfsId=co_route.get("gtfs_id", co_route.get("gtfs", [None])[0]),
+                    seq=len(co_route["stops"]),
                 )
             )
 
