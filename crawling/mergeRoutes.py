@@ -170,14 +170,12 @@ def getRouteId(v):
 
 def smartUnique():
     _routeList = []
-    for i in range(len(routeList)):
-        route_i = routeList[i]
+    for i, route_i in enumerate(routeList):
         if route_i.get("skip", False):
             continue
         founds = []
         # compare route one-by-one
-        for j in range(i + 1, len(routeList)):
-            route_j = routeList[j]
+        for j, route_j in enumerate(routeList[i + 1 :], start=i + 1):
             if (
                 route_i["route"] == route_j["route"]
                 and len(route_i["stops"]) == len(route_j["stops"])
