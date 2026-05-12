@@ -168,14 +168,14 @@ def getRouteId(v):
     )
 
 
-def smartUnique():
+def smartUnique(route_list):
     _routeList = []
-    for i, route_i in enumerate(routeList):
+    for i, route_i in enumerate(route_list):
         if route_i.get("skip", False):
             continue
         founds = []
         # compare route one-by-one
-        for j, route_j in enumerate(routeList[i + 1 :], start=i + 1):
+        for j, route_j in enumerate(route_list[i + 1 :], start=i + 1):
             if (
                 route_i["route"] == route_j["route"]
                 and len(route_i["stops"]) == len(route_j["stops"])
@@ -193,9 +193,9 @@ def smartUnique():
 
         # update obj
         for found in founds:
-            route_i["co"].extend(routeList[found]["co"])
-            route_i["stops"].extend(routeList[found]["stops"])
-            routeList[found]["skip"] = True
+            route_i["co"].extend(route_list[found]["co"])
+            route_i["stops"].extend(route_list[found]["stops"])
+            route_list[found]["skip"] = True
 
         # append return array
         _routeList.append(route_i)
@@ -216,7 +216,7 @@ def main():
     for co in PROVIDERS:
         importRouteListJson(co)
 
-    routeList = smartUnique()
+    routeList = smartUnique(routeList)
     for route in routeList:
         route["stops"] = {co: stops for co, stops in route["stops"]}
 
