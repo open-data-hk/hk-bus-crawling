@@ -6,6 +6,7 @@ from utils import DATA_DIR
 
 routeList = []
 stopList = {}
+# TODO: remove or fix. stopMap is always empty here, isMatchStops is always false
 stopMap = {}
 PROVIDERS = [
     "kmb",
@@ -266,6 +267,7 @@ def main():
         {
             "routeList": {getRouteId(v): v for v in routeList},
             "stopList": stopList,
+            # TODO: simply set it is empty dict
             "stopMap": stopMap,
             "holidays": holidays,
             "serviceDayMap": serviceDayMap,
