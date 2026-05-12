@@ -171,37 +171,36 @@ def getRouteId(v):
 def smartUnique():
     _routeList = []
     for i in range(len(routeList)):
-        if routeList[i].get("skip", False):
+        route_i = routeList[i]
+        if route_i.get("skip", False):
             continue
         founds = []
         # compare route one-by-one
         for j in range(i + 1, len(routeList)):
+            route_j = routeList[j]
             if (
-                routeList[i]["route"] == routeList[j]["route"]
-                and len(routeList[i]["stops"]) == len(routeList[j]["stops"])
-                and len([co for co in routeList[i]["co"] if co in routeList[j]["co"]])
-                == 0
-                and isMatchStops(
-                    routeList[i]["stops"][0][1], routeList[j]["stops"][0][1]
-                )
+                route_i["route"] == route_j["route"]
+                and len(route_i["stops"]) == len(route_j["stops"])
+                and len([co for co in route_i["co"] if co in route_j["co"]]) == 0
+                and isMatchStops(route_i["stops"][0][1], route_j["stops"][0][1])
             ):
                 founds.append(j)
             elif (
-                routeList[i]["route"] == routeList[j]["route"]
-                and str(routeList[i]["serviceType"]) == str(routeList[j]["serviceType"])
-                and routeList[i]["orig"]["en"] == routeList[j]["orig"]["en"]
-                and routeList[i]["dest"]["en"] == routeList[j]["dest"]["en"]
+                route_i["route"] == route_j["route"]
+                and str(route_i["serviceType"]) == str(route_j["serviceType"])
+                and route_i["orig"]["en"] == route_j["orig"]["en"]
+                and route_i["dest"]["en"] == route_j["dest"]["en"]
             ):
-                routeList[j]["serviceType"] = str(int(routeList[j]["serviceType"]) + 1)
+                route_j["serviceType"] = str(int(route_j["serviceType"]) + 1)
 
         # update obj
         for found in founds:
-            routeList[i]["co"].extend(routeList[found]["co"])
-            routeList[i]["stops"].extend(routeList[found]["stops"])
+            route_i["co"].extend(routeList[found]["co"])
+            route_i["stops"].extend(routeList[found]["stops"])
             routeList[found]["skip"] = True
 
         # append return array
-        _routeList.append(routeList[i])
+        _routeList.append(route_i)
 
     return _routeList
 
