@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, NotRequired, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict
 
 ProviderCode = Literal[
     "ctb",
@@ -33,6 +33,7 @@ class ProviderRoute(TypedDict):
     stops: list[str]
     service_type: NotRequired[int | str]
     gtfs_id: NotRequired[str]
+    freq: NotRequired[dict[str, Any]]
 
 
 class ProviderStop(TypedDict):
