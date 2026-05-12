@@ -26,11 +26,13 @@ class ProviderRoute(TypedDict):
     bound: RouteBound | str
     orig_en: str
     orig_tc: str
+    orig_sc: str
     dest_en: str
     dest_tc: str
+    dest_sc: str
     stops: list[str]
-    serviceType: NotRequired[int | str]
-    gtfsId: NotRequired[str]
+    service_type: NotRequired[int | str]
+    gtfs_id: NotRequired[str]
 
 
 class ProviderStop(TypedDict):
@@ -39,5 +41,6 @@ class ProviderStop(TypedDict):
     stop: str
     name_en: str
     name_tc: str
+    name_sc: str
     lat: float | str
-    long: float | str
+    lng: float | str
