@@ -92,6 +92,18 @@ def isSameStopSequence(co_stop_ids, w_stop_ids, whole_stop_list):
     return True
 
 
+def isSameRouteCandidate(co, co_route, w_route):
+    if co_route["route"] != w_route["route"]:
+        return False
+    if co not in w_route["co"]:
+        return False
+    if not isGtfsMatch(w_route, co_route):
+        return False
+    if co in w_route["bound"] and w_route["bound"][co] != co_route["bound"]:
+        return False
+    return True
+
+
 def importRouteListJson(co, whole_route_list, whole_stop_list):
     co_route_list = loadJson(DATA_DIR / f"routeFareList.{co}.cleansed.json")
     co_stop_list = loadJson(DATA_DIR / f"stopList.{co}.json")
@@ -121,30 +133,24 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
         }
 
         for w_route in whole_route_list:
-            if (
-                co_route["route"] == w_route["route"]
-                and co in w_route["co"]
-                and isGtfsMatch(w_route, co_route)
-            ):
-                # skip checking if the bound is not the same
-                if co in w_route["bound"] and w_route["bound"][co] != co_route["bound"]:
-                    continue
+            if not isSameRouteCandidate(co, co_route, w_route):
+                continue
 
-                if isSameStopSequence(
-                    co_route["stops"], w_route["stops"][0][1], whole_stop_list
+            if isSameStopSequence(
+                co_route["stops"], w_route["stops"][0][1], whole_stop_list
+            ):
+                found = True
+                w_route["stops"].append((co, co_route["stops"]))
+                w_route["bound"][co] = co_route["bound"]
+            elif (
+                co_route["orig_en"].upper() == w_route["orig"]["en"].upper()
+                and co_route["dest_en"].upper() == w_route["dest"]["en"].upper()
+            ):
+                special_type = int(w_route["serviceType"]) + 1
+                if co_route["route"] == "606" and co_route["dest_tc"].startswith(
+                    "彩雲"
                 ):
-                    found = True
-                    w_route["stops"].append((co, co_route["stops"]))
-                    w_route["bound"][co] = co_route["bound"]
-                elif (
-                    co_route["orig_en"].upper() == w_route["orig"]["en"].upper()
-                    and co_route["dest_en"].upper() == w_route["dest"]["en"].upper()
-                ):
-                    special_type = int(w_route["serviceType"]) + 1
-                    if co_route["route"] == "606" and co_route["dest_tc"].startswith(
-                        "彩雲"
-                    ):
-                        print("Yes", special_type)
+                    print("Yes", special_type)
 
         if not found:
             whole_route_list.append(
