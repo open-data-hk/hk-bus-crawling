@@ -46,6 +46,19 @@ type StopListGrid = dict[str, list[str]]
 type StopGroup = list[list[str]]
 
 
+def get_stops_haversine_distance(stop_a: Stop, stop_b: Stop) -> float:
+    if (
+        stop_a["location"]["lat"] == stop_b["location"]["lat"]
+        and stop_a["location"]["lng"] == stop_b["location"]["lng"]
+    ):
+        return 0
+    return haversine(
+        (stop_a["location"]["lat"], stop_a["location"]["lng"]),
+        (stop_b["location"]["lat"], stop_b["location"]["lng"]),
+        unit=Unit.METERS,  # specify that we want distance in meter, default is km
+    )
+
+
 def get_stop_group(
     stop_list: StopList,
     stop_seq_mapping: StopSeqMapping,
@@ -55,18 +68,6 @@ def get_stop_group(
     DISTANCE_THRESHOLD = 50  # in metres
     BEARING_THRESHOLD = 45  # in degrees
     STOP_LIST_LIMIT = 50  # max number of stops in a group
-
-    def get_stops_haversine_distance(stop_a: Stop, stop_b: Stop) -> float:
-        if (
-            stop_a["location"]["lat"] == stop_b["location"]["lat"]
-            and stop_a["location"]["lng"] == stop_b["location"]["lng"]
-        ):
-            return 0
-        return haversine(
-            (stop_a["location"]["lat"], stop_a["location"]["lng"]),
-            (stop_b["location"]["lat"], stop_b["location"]["lng"]),
-            unit=Unit.METERS,  # specify that we want distance in meter, default is km
-        )
 
     bearing_targets = stop_seq_mapping.get(stop_id, {}).get("bearings", [])
 
