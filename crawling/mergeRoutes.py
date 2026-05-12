@@ -64,7 +64,7 @@ def isGtfsMatch(knownRoute, newRoute):
     return knownRoute["gtfsId"] in newRoute["gtfs"]
 
 
-def importRouteListJson(co):
+def importRouteListJson(co, route_list, stop_list):
     _routeList = json.load(
         open(DATA_DIR / ("routeFareList.%s.cleansed.json" % co), "r", encoding="UTF-8")
     )
@@ -72,9 +72,9 @@ def importRouteListJson(co):
         open(DATA_DIR / ("stopList.%s.json" % co), "r", encoding="UTF-8")
     )
     for stopId, stop in _stopList.items():
-        if stopId not in stopList:
+        if stopId not in stop_list:
             try:
-                stopList[stopId] = {
+                stop_list[stopId] = {
                     "name": {"en": stop["name_en"], "tc": stop["name_tc"]},
                     "location": {"lat": float(stop["lat"]), "lng": float(stop["lng"])},
                 }
@@ -93,7 +93,7 @@ def importRouteListJson(co):
             "tc": _route["dest_tc"].replace("/", "／"),
         }
 
-        for route in routeList:
+        for route in route_list:
             if (
                 _route["route"] == route["route"]
                 and co in route["co"]
@@ -107,8 +107,8 @@ def importRouteListJson(co):
                     dist = 0
                     merge = True
                     for stop_a, stop_b in zip(_route["stops"], route["stops"][0][1]):
-                        stop_a = stopList[stop_a]
-                        stop_b = stopList[stop_b]
+                        stop_a = stop_list[stop_a]
+                        stop_b = stop_list[stop_b]
                         dist = haversine(
                             (stop_a["location"]["lat"], stop_a["location"]["lng"]),
                             (stop_b["location"]["lat"], stop_b["location"]["lng"]),
@@ -130,7 +130,7 @@ def importRouteListJson(co):
                         print("Yes", speicalType)
 
         if not found:
-            routeList.append(
+            route_list.append(
                 getRouteObj(
                     route=_route["route"],
                     co=_route["co"],
@@ -214,7 +214,7 @@ def main():
     global routeList
 
     for co in PROVIDERS:
-        importRouteListJson(co)
+        importRouteListJson(co, routeList, stopList)
 
     routeList = smartUnique(routeList)
     for route in routeList:
