@@ -47,7 +47,6 @@ type StopGroup = list[list[str]]
 
 
 def get_stop_group(
-    route_list: RouteList,
     stop_list: StopList,
     stop_seq_mapping: StopSeqMapping,
     stop_list_grid: StopListGrid,
@@ -292,7 +291,7 @@ def merge_stop_list() -> None:
         #     logger.info(f"Processed {count} stops ({group_count} groups) at {(time.time() - start_time) * 1000:.2f}ms")
 
         stop_group = get_stop_group(
-            route_list, stop_list, stop_seq_mapping, stop_list_grid, stop_id
+            stop_list, stop_seq_mapping, stop_list_grid, stop_id
         )
         if len(stop_group) > 0:
             group_count += 1
