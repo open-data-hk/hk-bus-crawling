@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Literal
 
 import httpx
-from crawl_utils import emitRequest, get_request_limit
+from crawl_utils import dump_provider_data, emitRequest, get_request_limit
+from schemas import ProviderRoute, ProviderStop
 from utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
@@ -114,7 +115,7 @@ async def prepare_data():
             )
 
     _stop_ids = []
-    stop_list = {}
+    stop_list: dict[str, ProviderStop] = {}
     if STOP_LIST.exists():
         with open(STOP_LIST, "r", encoding="UTF-8") as f:
             stop_list = json.load(f)
@@ -155,8 +156,9 @@ async def prepare_data():
     stopInfos = list(zip(_stop_ids, stop_list_raw))
     for stopId, stopInfo in stopInfos:
         stop_list[stopId] = stopInfo
+        stopInfo["lng"] = stopInfo.pop("long")
 
-    _routeList = []
+    _routeList: list[ProviderRoute] = []
     for route in route_list:
         if route.get("bound", 0) != 0:
             _routeList.append(route)
@@ -178,6 +180,11 @@ async def prepare_data():
                             if bound == "outbound"
                             else route["dest_tc"]
                         ),
+                        "orig_sc": (
+                            route["orig_sc"]
+                            if bound == "outbound"
+                            else route["dest_sc"]
+                        ),
                         "dest_en": (
                             route["dest_en"]
                             if bound == "outbound"
@@ -188,20 +195,22 @@ async def prepare_data():
                             if bound == "outbound"
                             else route["orig_tc"]
                         ),
+                        "dest_sc": (
+                            route["dest_sc"]
+                            if bound == "outbound"
+                            else route["orig_sc"]
+                        ),
                         "stops": list(
                             filter(
                                 lambda stopId: bool(stop_list[stopId]),
                                 route["stops"][bound],
                             )
                         ),
-                        "serviceType": 0,
+                        "service_type": 0,
                     }
                 )
 
-    with open(ROUTE_LIST, "w", encoding="UTF-8") as f:
-        f.write(json.dumps(_routeList, ensure_ascii=False))
-    with open(STOP_LIST, "w", encoding="UTF-8") as f:
-        f.write(json.dumps(stop_list, ensure_ascii=False))
+    dump_provider_data("ctb", _routeList, stop_list)
 
 
 if __name__ == "__main__":

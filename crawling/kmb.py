@@ -6,7 +6,8 @@ import sys
 from os import path
 
 import httpx
-from crawl_utils import emitRequest
+from crawl_utils import dump_provider_data, emitRequest
+from schemas import ProviderRoute, ProviderStop
 from utils import DATA_DIR
 
 BASE_URL = "https://data.etabus.gov.hk/v1/transport/kmb"
@@ -33,7 +34,7 @@ async def getRouteStop():
     if path.isfile(ROUTE_LIST):
         return
 
-    stopList = {}
+    stopList: dict[str, ProviderStop] = {}
     if path.isfile(STOP_LIST):
         with open(STOP_LIST, "r", encoding="UTF-8") as f:
             stopList = json.load(f)
@@ -43,6 +44,7 @@ async def getRouteStop():
         _stopList = r.json()["data"]
         for stop in _stopList:
             stopList[stop["stop"]] = stop
+            stop["lng"] = stop.pop("long")
 
     def isStopExist(stopId):
         if stopId not in stopList:
@@ -84,16 +86,13 @@ async def getRouteStop():
         routeList[routeKey]["stops"] = stops
 
     # flatten the routeList back to array
-    routeList = [
+    routeList: list[ProviderRoute] = [
         routeList[routeKey]
         for routeKey in routeList.keys()
         if not routeKey.startswith("K")
     ]
 
-    with open(ROUTE_LIST, "w", encoding="UTF-8") as f:
-        f.write(json.dumps(routeList, ensure_ascii=False))
-    with open(STOP_LIST, "w", encoding="UTF-8") as f:
-        f.write(json.dumps(stopList, ensure_ascii=False))
+    dump_provider_data("kmb", routeList, stopList)
 
 
 if __name__ == "__main__":

@@ -9,7 +9,8 @@ from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 import httpx
-from crawl_utils import emitRequest, get_request_limit
+from crawl_utils import dump_provider_data, emitRequest, get_request_limit
+from schemas import ProviderRoute, ProviderStop
 from utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
@@ -164,8 +165,8 @@ async def getRouteStop(co):
             )
         return freq
 
-    routeList = []
-    stops = {}
+    routeList: list[ProviderRoute] = []
+    stops: dict[str, ProviderStop] = {}
 
     stopCandidates = {}
 
@@ -186,10 +187,15 @@ async def getRouteStop(co):
                 oldNameTc = (
                     stops[str(stop_id)]["name_tc"] if str(stop_id) in stops else ""
                 )
+                oldNameSc = (
+                    stops[str(stop_id)]["name_sc"] if str(stop_id) in stops else ""
+                )
                 newNameEn = stop["name_en"].strip()
                 newNameTc = stop["name_tc"].strip()
+                newNameSc = stop["name_sc"].strip()
                 useNameEn = oldNameEn
                 useNameTc = oldNameTc
+                useNameSc = oldNameSc
                 toReplace = False
 
                 # Prefer longer Chinese names. They are usually more specific
@@ -218,6 +224,7 @@ async def getRouteStop(co):
                                     toReplace = True
                 if toReplace:
                     useNameTc = newNameTc
+                    useNameSc = newNameSc
                     useNameEn = newNameEn
 
                 if oldNameEn.upper() == newNameEn.upper():
@@ -248,14 +255,18 @@ async def getRouteStop(co):
                     "stop": str(stop_id),
                     "name_en": useNameEn,
                     "name_tc": useNameTc,
+                    "name_sc": useNameSc,
                 }
             routeList.append(
                 {
-                    "gtfsId": str(route["route_id"]),
+                    "co": co,
+                    "gtfs_id": str(route["route_id"]),
                     "route": route_no,
                     "orig_tc": direction["orig_tc"],
+                    "orig_sc": direction["orig_sc"],
                     "orig_en": direction["orig_en"],
                     "dest_tc": direction["dest_tc"],
+                    "dest_sc": direction["dest_sc"],
                     "dest_en": direction["dest_en"],
                     "bound": "O" if direction["route_seq"] == 1 else "I",
                     "service_type": (
@@ -438,10 +449,7 @@ async def getRouteStop(co):
     for route_id, route in all_routes.items():
         process_route_directions(route, route["route_code"], all_route_stops)
 
-    routeList.sort(key=lambda a: a["gtfsId"])
-
-    with open(DATA_DIR / f"routeList.{co}.json", "w", encoding="UTF-8") as f:
-        json.dump(routeList, f, ensure_ascii=False)
+    routeList.sort(key=lambda a: a["gtfs_id"])
     logger.info("Route done")
 
     with open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8") as f:
@@ -521,15 +529,14 @@ async def getRouteStop(co):
             stops[stop_id]["lat"] = all_stops[stop_id]["coordinates"]["wgs84"][
                 "latitude"
             ]
-            stops[stop_id]["long"] = all_stops[stop_id]["coordinates"]["wgs84"][
+            stops[stop_id]["lng"] = all_stops[stop_id]["coordinates"]["wgs84"][
                 "longitude"
             ]
         else:
             stops[stop_id]["lat"] = gtfsStops[stop_id]["lat"]
-            stops[stop_id]["long"] = gtfsStops[stop_id]["lng"]
+            stops[stop_id]["lng"] = gtfsStops[stop_id]["lng"]
 
-    with open(DATA_DIR / f"stopList.{co}.json", "w", encoding="UTF-8") as f:
-        json.dump(stops, f, ensure_ascii=False)
+    dump_provider_data(co, routeList, stops)
     for stop in stopCandidates:
         stopCandidates[stop]["tc_others"].discard(stopCandidates[stop]["tc_used"])
         stopCandidates[stop]["tc_others"] = sorted(stopCandidates[stop]["tc_others"])

@@ -4,7 +4,8 @@ import logging
 from os import path
 
 import httpx
-from crawl_utils import emitRequest
+from crawl_utils import dump_provider_data, emitRequest
+from schemas import ProviderRoute, ProviderStop
 from utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,7 @@ async def getRouteStop(co):
 
     a_client = httpx.AsyncClient()
     # load route list and stop list if exist
-    routeList = []
+    routeList: list[ProviderRoute] = []
     if path.isfile(ROUTE_LIST):
         logger.warning(f"{ROUTE_LIST} already exist, skipping...")
         return
@@ -42,18 +43,20 @@ async def getRouteStop(co):
                     "bound": "O",
                     "orig_en": route["routeName_e"].split(" > ")[0],
                     "orig_tc": route["routeName_c"].split(" > ")[0],
+                    "orig_sc": route["routeName_s"].split(" > ")[0],
                     "dest_en": route["routeName_e"].split(" > ")[1],
                     "dest_tc": route["routeName_c"].split(" > ")[1],
+                    "dest_sc": route["routeName_s"].split(" > ")[1],
                     "service_type": str(
                         1 + route["overnightRoute"] * 2 + route["specialRoute"] * 4
                     ),
                     "stops": [],
-                    "co": ["nlb"],
+                    "co": co,
                 }
             )
         logger.info("Digested route list")
 
-    stopList = {}
+    stopList: dict[str, ProviderStop] = {}
     if path.isfile(STOP_LIST):
         with open(STOP_LIST, "r", encoding="UTF-8") as f:
             stopList = json.load(f)
@@ -77,8 +80,9 @@ async def getRouteStop(co):
                     "stop": stop["stopId"],
                     "name_en": stop["stopName_e"],
                     "name_tc": stop["stopName_c"],
+                    "name_sc": stop["stopName_s"],
                     "lat": stop["latitude"],
-                    "long": stop["longitude"],
+                    "lng": stop["longitude"],
                 }
             stopIds.append(stop["stopId"])
             fares.append(stop["fare"])
@@ -94,12 +98,7 @@ async def getRouteStop(co):
 
     await getRouteStopList()
 
-    with (
-        open(ROUTE_LIST, "w", encoding="UTF-8") as rf,
-        open(STOP_LIST, "w", encoding="UTF-8") as sf,
-    ):
-        json.dump(routeList, rf, ensure_ascii=False)
-        json.dump(stopList, sf, ensure_ascii=False)
+    dump_provider_data(co, routeList, stopList)
     logger.info("Dumped lists")
 
 
