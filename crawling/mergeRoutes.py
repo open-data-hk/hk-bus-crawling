@@ -6,7 +6,30 @@ from utils import DATA_DIR
 
 routeList = []
 stopList = {}
+# TODO: remove or fix. stopMap is always empty here, isMatchStops is always false
 stopMap = {}
+PROVIDERS = [
+    "kmb",
+    "ctb",
+    "nlb",
+    "lrtfeeder",
+    "gmb",
+    "lightRail",
+    "mtr",
+    "sunferry",
+    "fortuneferry",
+    "hkkf",
+]
+
+
+def loadJson(path):
+    with open(path, "r", encoding="UTF-8") as f:
+        return json.load(f)
+
+
+def writeJson(path, data, **kwargs):
+    with open(path, "w", encoding="UTF-8") as f:
+        json.dump(data, f, ensure_ascii=False, **kwargs)
 
 
 def getRouteObj(
@@ -52,88 +75,117 @@ def isGtfsMatch(knownRoute, newRoute):
     return knownRoute["gtfsId"] in newRoute["gtfs"]
 
 
-def importRouteListJson(co):
-    _routeList = json.load(
-        open(DATA_DIR / ("routeFareList.%s.cleansed.json" % co), "r", encoding="UTF-8")
+def isSameStopSequence(co_stop_ids, w_stop_ids, whole_stop_list):
+    if len(co_stop_ids) != len(w_stop_ids):
+        return False
+
+    for co_stop_id, w_stop_id in zip(co_stop_ids, w_stop_ids):
+        co_stop = whole_stop_list[co_stop_id]
+        w_stop = whole_stop_list[w_stop_id]
+        dist = haversine(
+            (co_stop["location"]["lat"], co_stop["location"]["lng"]),
+            (w_stop["location"]["lat"], w_stop["location"]["lng"]),
+            unit=Unit.METERS,  # specify that we want distance in metres, default unit is km
+        )
+        if dist >= 300:
+            return False
+
+    return True
+
+
+def isSameRouteCandidate(co, co_route, w_route):
+    if co_route["route"] != w_route["route"]:
+        return False
+    if co not in w_route["co"]:
+        return False
+    if not isGtfsMatch(w_route, co_route):
+        return False
+    if co in w_route["bound"] and w_route["bound"][co] != co_route["bound"]:
+        return False
+    return True
+
+
+def isOrigDestSameEnName(co_route, w_route):
+    return (
+        co_route["orig_en"].upper() == w_route["orig"]["en"].upper()
+        and co_route["dest_en"].upper() == w_route["dest"]["en"].upper()
     )
-    _stopList = json.load(
-        open(DATA_DIR / ("stopList.%s.json" % co), "r", encoding="UTF-8")
-    )
-    for stopId, stop in _stopList.items():
-        if stopId not in stopList:
+
+
+def getStopObj(co_stop):
+    return {
+        "name": {
+            "en": co_stop["name_en"],
+            "tc": co_stop["name_tc"],
+            # TODO: implement sc
+            # "sc": co_stop["name_sc"],
+        },
+        "location": {
+            "lat": float(co_stop["lat"]),
+            "lng": float(co_stop["lng"]),
+        },
+    }
+
+
+def getRouteNameObj(co_route, prefix):
+    return {
+        "en": co_route[f"{prefix}_en"].replace("/", "／"),
+        "tc": co_route[f"{prefix}_tc"].replace("/", "／"),
+        # TODO: implement sc
+        # "sc": co_route[f"{prefix}_sc"].replace("/", "／"),
+    }
+
+
+def importRouteListJson(co, whole_route_list, whole_stop_list):
+    co_route_list = loadJson(DATA_DIR / f"routeFareList.{co}.cleansed.json")
+    co_stop_list = loadJson(DATA_DIR / f"stopList.{co}.json")
+    for co_stop_id, co_stop in co_stop_list.items():
+        if co_stop_id not in whole_stop_list:
             try:
-                stopList[stopId] = {
-                    "name": {"en": stop["name_en"], "tc": stop["name_tc"]},
-                    "location": {"lat": float(stop["lat"]), "lng": float(stop["lng"])},
-                }
+                whole_stop_list[co_stop_id] = getStopObj(co_stop)
             except BaseException:
-                print("Problematic stop: ", stopId, file=stderr)
+                print("Problematic stop: ", co_stop_id, file=stderr)
 
-    for _route in _routeList:
+    for co_route in co_route_list:
         found = False
-        speicalType = 1
-        orig = {
-            "en": _route["orig_en"].replace("/", "／"),
-            "tc": _route["orig_tc"].replace("/", "／"),
-        }
-        dest = {
-            "en": _route["dest_en"].replace("/", "／"),
-            "tc": _route["dest_tc"].replace("/", "／"),
-        }
+        special_type = 1
+        orig = getRouteNameObj(co_route, "orig")
+        dest = getRouteNameObj(co_route, "dest")
 
-        for route in routeList:
-            if (
-                _route["route"] == route["route"]
-                and co in route["co"]
-                and isGtfsMatch(route, _route)
+        for w_route in whole_route_list:
+            if not isSameRouteCandidate(co, co_route, w_route):
+                continue
+
+            if isSameStopSequence(
+                co_route["stops"], w_route["stops"][0][1], whole_stop_list
             ):
-                # skip checking if the bound is not the same
-                if co in route["bound"] and route["bound"][co] != _route["bound"]:
-                    continue
-
-                if len(_route["stops"]) == route["seq"]:
-                    dist = 0
-                    merge = True
-                    for stop_a, stop_b in zip(_route["stops"], route["stops"][0][1]):
-                        stop_a = stopList[stop_a]
-                        stop_b = stopList[stop_b]
-                        dist = haversine(
-                            (stop_a["location"]["lat"], stop_a["location"]["lng"]),
-                            (stop_b["location"]["lat"], stop_b["location"]["lng"]),
-                            unit=Unit.METERS,  # specify that we want distance in metres, default unit is km
-                        )
-                        merge = merge and dist < 300
-                    if merge:
-                        found = True
-                        route["stops"].append((co, _route["stops"]))
-                        route["bound"][co] = _route["bound"]
-                elif (
-                    _route["orig_en"].upper() == route["orig"]["en"].upper()
-                    and _route["dest_en"].upper() == route["dest"]["en"].upper()
+                found = True
+                w_route["stops"].append((co, co_route["stops"]))
+                w_route["bound"][co] = co_route["bound"]
+            elif isOrigDestSameEnName(co_route, w_route):
+                special_type = int(w_route["serviceType"]) + 1
+                if co_route["route"] == "606" and co_route["dest_tc"].startswith(
+                    "彩雲"
                 ):
-                    speicalType = int(route["serviceType"]) + 1
-                    if _route["route"] == "606" and _route["dest_tc"].startswith(
-                        "彩雲"
-                    ):
-                        print("Yes", speicalType)
+                    print("Yes", special_type)
 
         if not found:
-            routeList.append(
+            whole_route_list.append(
                 getRouteObj(
-                    route=_route["route"],
-                    co=_route["co"],
-                    serviceType=_route.get("service_type", speicalType),
-                    stops=[(co, _route["stops"])],
-                    bound={co: _route["bound"]},
+                    route=co_route["route"],
+                    co=co_route["co"],
+                    serviceType=co_route.get("service_type", special_type),
+                    stops=[(co, co_route["stops"])],
+                    bound={co: co_route["bound"]},
                     orig=orig,
                     dest=dest,
-                    fares=_route.get("fares", None),
-                    faresHoliday=_route.get("faresHoliday", None),
-                    freq=_route.get("freq", None),
-                    jt=_route.get("jt", None),
-                    nlbId=_route.get("id", None),
-                    gtfsId=_route.get("gtfs_id", _route.get("gtfs", [None])[0]),
-                    seq=len(_route["stops"]),
+                    fares=co_route.get("fares", None),
+                    faresHoliday=co_route.get("faresHoliday", None),
+                    freq=co_route.get("freq", None),
+                    jt=co_route.get("jt", None),
+                    nlbId=co_route.get("id", None),
+                    gtfsId=co_route.get("gtfs_id", co_route.get("gtfs", [None])[0]),
+                    seq=len(co_route["stops"]),
                 )
             )
 
@@ -156,62 +208,39 @@ def getRouteId(v):
     )
 
 
-def smartUnique():
+def smartUnique(route_list):
     _routeList = []
-    for i in range(len(routeList)):
-        if routeList[i].get("skip", False):
+    for i, route_i in enumerate(route_list):
+        if route_i.get("skip", False):
             continue
         founds = []
         # compare route one-by-one
-        for j in range(i + 1, len(routeList)):
+        for j, route_j in enumerate(route_list[i + 1 :], start=i + 1):
             if (
-                routeList[i]["route"] == routeList[j]["route"]
-                and len(routeList[i]["stops"]) == len(routeList[j]["stops"])
-                and len([co for co in routeList[i]["co"] if co in routeList[j]["co"]])
-                == 0
-                and isMatchStops(
-                    routeList[i]["stops"][0][1], routeList[j]["stops"][0][1]
-                )
+                route_i["route"] == route_j["route"]
+                and len(route_i["stops"]) == len(route_j["stops"])
+                and len([co for co in route_i["co"] if co in route_j["co"]]) == 0
+                and isMatchStops(route_i["stops"][0][1], route_j["stops"][0][1])
             ):
                 founds.append(j)
             elif (
-                routeList[i]["route"] == routeList[j]["route"]
-                and str(routeList[i]["serviceType"]) == str(routeList[j]["serviceType"])
-                and routeList[i]["orig"]["en"] == routeList[j]["orig"]["en"]
-                and routeList[i]["dest"]["en"] == routeList[j]["dest"]["en"]
+                route_i["route"] == route_j["route"]
+                and str(route_i["serviceType"]) == str(route_j["serviceType"])
+                and route_i["orig"]["en"] == route_j["orig"]["en"]
+                and route_i["dest"]["en"] == route_j["dest"]["en"]
             ):
-                routeList[j]["serviceType"] = str(int(routeList[j]["serviceType"]) + 1)
+                route_j["serviceType"] = str(int(route_j["serviceType"]) + 1)
 
         # update obj
         for found in founds:
-            routeList[i]["co"].extend(routeList[found]["co"])
-            routeList[i]["stops"].extend(routeList[found]["stops"])
-            routeList[found]["skip"] = True
+            route_i["co"].extend(route_list[found]["co"])
+            route_i["stops"].extend(route_list[found]["stops"])
+            route_list[found]["skip"] = True
 
         # append return array
-        _routeList.append(routeList[i])
+        _routeList.append(route_i)
 
     return _routeList
-
-
-importRouteListJson("kmb")
-importRouteListJson("ctb")
-importRouteListJson("nlb")
-importRouteListJson("lrtfeeder")
-importRouteListJson("gmb")
-importRouteListJson("lightRail")
-importRouteListJson("mtr")
-importRouteListJson("sunferry")
-importRouteListJson("fortuneferry")
-importRouteListJson("hkkf")
-routeList = smartUnique()
-for route in routeList:
-    route["stops"] = {co: stops for co, stops in route["stops"]}
-
-holidays = json.load(open(DATA_DIR / "holiday.json", "r", encoding="UTF-8"))
-serviceDayMap = json.load(open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8"))[
-    "serviceDayMap"
-]
 
 
 def standardizeDict(d):
@@ -221,18 +250,35 @@ def standardizeDict(d):
     }
 
 
-db = standardizeDict(
-    {
-        "routeList": {getRouteId(v): v for v in routeList},
-        "stopList": stopList,
-        "stopMap": stopMap,
-        "holidays": holidays,
-        "serviceDayMap": serviceDayMap,
-    }
-)
+def main():
+    global routeList
 
-with open(DATA_DIR / "routeFareList.mergeRoutes.json", "w", encoding="UTF-8") as f:
-    f.write(json.dumps(db, ensure_ascii=False))
+    for co in PROVIDERS:
+        importRouteListJson(co, routeList, stopList)
 
-with open(DATA_DIR / "routeFareList.mergeRoutes.min.json", "w", encoding="UTF-8") as f:
-    f.write(json.dumps(db, ensure_ascii=False, separators=(",", ":")))
+    routeList = smartUnique(routeList)
+    for route in routeList:
+        route["stops"] = {co: stops for co, stops in route["stops"]}
+
+    holidays = loadJson(DATA_DIR / "holiday.json")
+    serviceDayMap = loadJson(DATA_DIR / "gtfs.json")["serviceDayMap"]
+
+    db = standardizeDict(
+        {
+            "routeList": {getRouteId(v): v for v in routeList},
+            "stopList": stopList,
+            # TODO: simply set it is empty dict
+            "stopMap": stopMap,
+            "holidays": holidays,
+            "serviceDayMap": serviceDayMap,
+        }
+    )
+
+    writeJson(DATA_DIR / "routeFareList.mergeRoutes.json", db)
+    writeJson(
+        DATA_DIR / "routeFareList.mergeRoutes.min.json", db, separators=(",", ":")
+    )
+
+
+if __name__ == "__main__":
+    main()
