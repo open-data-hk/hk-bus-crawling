@@ -111,33 +111,45 @@ def isOrigDestSameEnName(co_route, w_route):
     )
 
 
+def getStopObj(co_stop):
+    return {
+        "name": {
+            "en": co_stop["name_en"],
+            "tc": co_stop["name_tc"],
+            # TODO: implement sc
+            # "sc": co_stop["name_sc"],
+        },
+        "location": {
+            "lat": float(co_stop["lat"]),
+            "lng": float(co_stop["lng"]),
+        },
+    }
+
+
+def getRouteNameObj(co_route, prefix):
+    return {
+        "en": co_route[f"{prefix}_en"].replace("/", "／"),
+        "tc": co_route[f"{prefix}_tc"].replace("/", "／"),
+        # TODO: implement sc
+        # "sc": co_route[f"{prefix}_sc"].replace("/", "／"),
+    }
+
+
 def importRouteListJson(co, whole_route_list, whole_stop_list):
     co_route_list = loadJson(DATA_DIR / f"routeFareList.{co}.cleansed.json")
     co_stop_list = loadJson(DATA_DIR / f"stopList.{co}.json")
     for co_stop_id, co_stop in co_stop_list.items():
         if co_stop_id not in whole_stop_list:
             try:
-                whole_stop_list[co_stop_id] = {
-                    "name": {"en": co_stop["name_en"], "tc": co_stop["name_tc"]},
-                    "location": {
-                        "lat": float(co_stop["lat"]),
-                        "lng": float(co_stop["lng"]),
-                    },
-                }
+                whole_stop_list[co_stop_id] = getStopObj(co_stop)
             except BaseException:
                 print("Problematic stop: ", co_stop_id, file=stderr)
 
     for co_route in co_route_list:
         found = False
         special_type = 1
-        orig = {
-            "en": co_route["orig_en"].replace("/", "／"),
-            "tc": co_route["orig_tc"].replace("/", "／"),
-        }
-        dest = {
-            "en": co_route["dest_en"].replace("/", "／"),
-            "tc": co_route["dest_tc"].replace("/", "／"),
-        }
+        orig = getRouteNameObj(co_route, "orig")
+        dest = getRouteNameObj(co_route, "dest")
 
         for w_route in whole_route_list:
             if not isSameRouteCandidate(co, co_route, w_route):
