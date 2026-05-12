@@ -23,7 +23,7 @@ class CoStop(TypedDict):
     name_tc: str
     name_en: str
     lat: str
-    long: str
+    lng: str
 
 
 class GtfsStopName(TypedDict):
@@ -49,9 +49,9 @@ class Route(TypedDict, total=False):
     orig_tc: str
     dest_en: str
     dest_tc: str
-    serviceType: str
+    service_type: str
     stops: list[str]
-    gtfsId: str
+    gtfs_id: str
     virtual: bool
     found: bool
     gtfs: list[str]
@@ -188,7 +188,7 @@ def matchStopsByDp(
                 0
                 if co_stop["name_tc"] == gtfs_stop["stopName"][co]["tc"]
                 else haversine(
-                    (float(co_stop["lat"]), float(co_stop["long"])),
+                    (float(co_stop["lat"]), float(co_stop["lng"])),
                     (gtfs_stop["lat"], gtfs_stop["lng"]),
                 )
                 * 1000
@@ -275,7 +275,7 @@ def mergeRouteAsCircularRoute(routeA: Route, routeB: Route) -> Route:
         "orig_tc": routeA["orig_tc"],
         "dest_en": routeB["dest_en"],
         "dest_tc": routeB["dest_tc"],
-        "serviceType": routeA["serviceType"],
+        "service_type": routeA["service_type"],
         "stops": routeA["stops"] + routeB["stops"],
         "virtual": True,
     }
@@ -296,7 +296,7 @@ def getVirtualCircularRoutes(routeList: list[Route], routeNo: str) -> list[Route
     Returns:
         A list of exactly two virtual ``Route`` dicts (both orderings), or an
         empty list if there are not exactly two entries for ``routeNo`` or if
-        those entries are missing required fields (``co``, ``serviceType``).
+        those entries are missing required fields (``co``, ``service_type``).
 
     Example:
         >>> virtuals = getVirtualCircularRoutes(routeList, "46S")
@@ -316,7 +316,7 @@ def getVirtualCircularRoutes(routeList: list[Route], routeNo: str) -> list[Route
 
     routeA = routeList[indices[0]]
     routeB = routeList[indices[1]]
-    if "co" not in routeA or "serviceType" not in routeA:
+    if "co" not in routeA or "service_type" not in routeA:
         return []
 
     return [
@@ -392,7 +392,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
     Special handling:
 
     - **GMB / ferry operators** (``sunferry``, ``fortuneferry``, ``hkkf``):
-      Fare is read directly from GTFS via a pre-existing ``gtfsId`` field on
+      Fare is read directly from GTFS via a pre-existing GTFS ID field on
       each route rather than going through the DP matcher.
     - **MTR**: GTFS-derived candidates are NOT appended to the original route
       list to avoid duplicates; only existing entries are enriched.
@@ -436,7 +436,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
         debug = False and gtfs_id == "1047" and gtfs_route["orig"]["tc"] == "沙田站"
         if co == "gmb":  # handle for gmb
             for co_route in co_routes:
-                if co_route["gtfsId"] == gtfs_id:
+                if co_route["gtfs_id"] == gtfs_id:
                     # it assumes fare of all stops are the same
                     # TODO: inspect the validity of data
                     # there should be sectional fare
@@ -448,7 +448,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
                     ]
         elif co in ["sunferry", "fortuneferry"]:
             for co_route in co_routes:
-                if co_route["gtfsId"] == gtfs_id:
+                if co_route["gtfs_id"] == gtfs_id:
                     # it assumes fare of all stops are the same
                     # TODO: inspect the validity of data
                     flat_fare = get_fare(

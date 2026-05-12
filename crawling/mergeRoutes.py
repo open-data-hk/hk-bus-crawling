@@ -64,7 +64,7 @@ def importRouteListJson(co):
             try:
                 stopList[stopId] = {
                     "name": {"en": stop["name_en"], "tc": stop["name_tc"]},
-                    "location": {"lat": float(stop["lat"]), "lng": float(stop["long"])},
+                    "location": {"lat": float(stop["lat"]), "lng": float(stop["lng"])},
                 }
             except BaseException:
                 print("Problematic stop: ", stopId, file=stderr)
@@ -132,7 +132,7 @@ def importRouteListJson(co):
                     freq=_route.get("freq", None),
                     jt=_route.get("jt", None),
                     nlbId=_route.get("id", None),
-                    gtfsId=_route.get("gtfsId", _route.get("gtfs", [None])[0]),
+                    gtfsId=_route.get("gtfs_id", _route.get("gtfs", [None])[0]),
                     seq=len(_route["stops"]),
                 )
             )
