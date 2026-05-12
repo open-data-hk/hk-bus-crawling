@@ -74,6 +74,24 @@ def isGtfsMatch(knownRoute, newRoute):
     return knownRoute["gtfsId"] in newRoute["gtfs"]
 
 
+def isSameStopSequence(co_stop_ids, w_stop_ids, whole_stop_list):
+    if len(co_stop_ids) != len(w_stop_ids):
+        return False
+
+    for co_stop_id, w_stop_id in zip(co_stop_ids, w_stop_ids):
+        co_stop = whole_stop_list[co_stop_id]
+        w_stop = whole_stop_list[w_stop_id]
+        dist = haversine(
+            (co_stop["location"]["lat"], co_stop["location"]["lng"]),
+            (w_stop["location"]["lat"], w_stop["location"]["lng"]),
+            unit=Unit.METERS,  # specify that we want distance in metres, default unit is km
+        )
+        if dist >= 300:
+            return False
+
+    return True
+
+
 def importRouteListJson(co, whole_route_list, whole_stop_list):
     co_route_list = loadJson(DATA_DIR / f"routeFareList.{co}.cleansed.json")
     co_stop_list = loadJson(DATA_DIR / f"stopList.{co}.json")
@@ -112,24 +130,12 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
                 if co in w_route["bound"] and w_route["bound"][co] != co_route["bound"]:
                     continue
 
-                if len(co_route["stops"]) == w_route["seq"]:
-                    dist = 0
-                    merge = True
-                    for co_rstop_id, w_rstop_id in zip(
-                        co_route["stops"], w_route["stops"][0][1]
-                    ):
-                        co_rstop = whole_stop_list[co_rstop_id]
-                        w_rstop = whole_stop_list[w_rstop_id]
-                        dist = haversine(
-                            (co_rstop["location"]["lat"], co_rstop["location"]["lng"]),
-                            (w_rstop["location"]["lat"], w_rstop["location"]["lng"]),
-                            unit=Unit.METERS,  # specify that we want distance in metres, default unit is km
-                        )
-                        merge = merge and dist < 300
-                    if merge:
-                        found = True
-                        w_route["stops"].append((co, co_route["stops"]))
-                        w_route["bound"][co] = co_route["bound"]
+                if isSameStopSequence(
+                    co_route["stops"], w_route["stops"][0][1], whole_stop_list
+                ):
+                    found = True
+                    w_route["stops"].append((co, co_route["stops"]))
+                    w_route["bound"][co] = co_route["bound"]
                 elif (
                     co_route["orig_en"].upper() == w_route["orig"]["en"].upper()
                     and co_route["dest_en"].upper() == w_route["dest"]["en"].upper()
