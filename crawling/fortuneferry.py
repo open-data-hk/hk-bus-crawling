@@ -2,6 +2,8 @@
 
 import json
 
+from crawl_utils import dump_provider_data
+from schemas import ProviderRoute, ProviderStop
 from utils import DATA_DIR
 
 
@@ -24,8 +26,9 @@ def main():
         "7000004": ["東涌", "大澳"],
     }
 
-    routeList = []
-    stopList = {}
+    co = "fortuneferry"
+    routeList: list[ProviderRoute] = []
+    stopList: dict[str, ProviderStop] = {}
 
     for [route_code, [orig, dest]] in routes.items():
         for route_id, gtfsRoute in gtfsRoutes.items():
@@ -36,11 +39,14 @@ def main():
                 ):
                     routeList.append(
                         {
-                            "gtfsId": route_id,
+                            "co": co,
+                            "gtfs_id": route_id,
                             "route": route_code,
                             "orig_tc": gtfsRoute["orig"]["tc"],
+                            "orig_sc": gtfsRoute["orig"]["sc"],
                             "orig_en": gtfsRoute["orig"]["en"],
                             "dest_tc": gtfsRoute["dest"]["tc"],
+                            "dest_sc": gtfsRoute["dest"]["sc"],
                             "dest_en": gtfsRoute["dest"]["en"],
                             "service_type": 1,
                             "bound": "O",
@@ -51,11 +57,14 @@ def main():
                     if "2" in gtfsRoute["freq"]:
                         routeList.append(
                             {
-                                "gtfsId": route_id,
+                                "co": co,
+                                "gtfs_id": route_id,
                                 "route": route_code,
                                 "dest_tc": gtfsRoute["orig"]["tc"],
+                                "dest_sc": gtfsRoute["orig"]["sc"],
                                 "dest_en": gtfsRoute["orig"]["en"],
                                 "orig_tc": gtfsRoute["dest"]["tc"],
+                                "orig_sc": gtfsRoute["dest"]["sc"],
                                 "orig_en": gtfsRoute["dest"]["en"],
                                 "service_type": 1,
                                 "bound": "I",
@@ -78,15 +87,12 @@ def main():
                 "stop": stopId,
                 "name_en": gtfsStops[stopId]["stopName"]["ferry"]["en"],
                 "name_tc": gtfsStops[stopId]["stopName"]["ferry"]["tc"],
+                "name_sc": gtfsStops[stopId]["stopName"]["ferry"]["sc"],
                 "lat": gtfsStops[stopId]["lat"],
-                "long": gtfsStops[stopId]["lng"],
+                "lng": gtfsStops[stopId]["lng"],
             }
 
-    with open(DATA_DIR / "routeList.fortuneferry.json", "w", encoding="UTF-8") as f:
-        f.write(json.dumps(routeList, ensure_ascii=False))
-
-    with open(DATA_DIR / "stopList.fortuneferry.json", "w", encoding="UTF-8") as f:
-        f.write(json.dumps(stopList, ensure_ascii=False))
+    dump_provider_data(co, routeList, stopList)
 
 
 if __name__ == "__main__":
