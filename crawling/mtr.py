@@ -3,11 +3,11 @@
 
 import asyncio
 import csv
-import json
 import logging
 
 import httpx
-from crawl_utils import emitRequest
+from crawl_utils import dump_provider_data, emitRequest
+from schemas import ProviderRoute, ProviderStop
 from utils import DATA_DIR, query_igeocom_geojson
 
 BASE_URL = "https://opendata.mtr.com.hk/data"
@@ -30,7 +30,7 @@ async def getRouteStop(co="mtr"):
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
 
     routeList = {}
-    stopList = {}
+    stopList: dict[str, ProviderStop] = {}
 
     igeocom_features = query_igeocom_geojson(class_code="TRS", type_code="RSN")
     stations = {}
@@ -51,21 +51,25 @@ async def getRouteStop(co="mtr"):
             continue
         if route + "_" + bound not in routeList:
             routeList[route + "_" + bound] = {
-                "gtfsId": None,
+                "co": co,
                 "route": route,
                 "bound": bound,
                 "service_type": "1",
                 "orig_tc": None,
+                "orig_sc": None,
                 "orig_en": None,
                 "dest_tc": None,
+                "dest_sc": None,
                 "dest_en": None,
                 "stops": [None] * 100,
                 "fare": [],
             }
         if int(float(seq)) == 1:
             routeList[route + "_" + bound]["orig_tc"] = chn
+            routeList[route + "_" + bound]["orig_sc"] = chn
             routeList[route + "_" + bound]["orig_en"] = eng
         routeList[route + "_" + bound]["dest_tc"] = chn
+        routeList[route + "_" + bound]["dest_sc"] = chn
         routeList[route + "_" + bound]["dest_en"] = eng
         routeList[route + "_" + bound]["stops"][int(float(seq))] = stopCode
         if stopCode not in stopList:
@@ -80,28 +84,18 @@ async def getRouteStop(co="mtr"):
                 "stop": stopCode,
                 "name_en": eng,
                 "name_tc": chn,
+                "name_sc": chn,
                 "lat": lat,
-                "long": lng,
+                "lng": lng,
             }
 
-    with open(DATA_DIR / "routeList.mtr.json", "w", encoding="UTF-8") as f:
-        f.write(
-            json.dumps(
-                list(
-                    map(
-                        filterStops,
-                        [
-                            route
-                            for route in routeList.values()
-                            if len(route["stops"]) > 0
-                        ],
-                    )
-                ),
-                ensure_ascii=False,
-            )
+    routes: list[ProviderRoute] = list(
+        map(
+            filterStops,
+            [route for route in routeList.values() if len(route["stops"]) > 0],
         )
-    with open(DATA_DIR / "stopList.mtr.json", "w", encoding="UTF-8") as f:
-        f.write(json.dumps(stopList, ensure_ascii=False))
+    )
+    dump_provider_data(co, routes, stopList)
 
 
 if __name__ == "__main__":

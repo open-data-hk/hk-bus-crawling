@@ -3,11 +3,11 @@
 
 import asyncio
 import csv
-import json
 import logging
 
 import httpx
-from crawl_utils import emitRequest
+from crawl_utils import dump_provider_data, emitRequest
+from schemas import ProviderRoute, ProviderStop
 from utils import DATA_DIR, query_igeocom_geojson
 
 BASE_URL = "https://opendata.mtr.com.hk/data"
@@ -42,7 +42,7 @@ async def getRouteStop(co="lightRail"):
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
 
     routeList = {}
-    stopList = {}
+    stopList: dict[str, ProviderStop] = {}
     routeCollection = set()
 
     igeocom_features = query_igeocom_geojson(class_code="TRS", type_code="LRA")
@@ -62,13 +62,15 @@ async def getRouteStop(co="lightRail"):
         lightRailId = "LR" + stopId
         if key not in routeList:
             lightRailObject = routeList[key] = {
-                "gtfsId": None,
+                "co": co,
                 "route": route,
                 "bound": getBound(route, bound),
                 "service_type": "1",
                 "orig_tc": None,
+                "orig_sc": None,
                 "orig_en": None,
                 "dest_tc": None,
+                "dest_sc": None,
                 "dest_en": None,
                 "stops": [],
                 "fare": [],
@@ -78,11 +80,13 @@ async def getRouteStop(co="lightRail"):
 
         if key not in routeCollection:
             lightRailObject["orig_tc"] = chn
+            lightRailObject["orig_sc"] = chn
             lightRailObject["orig_en"] = eng
             routeCollection.add(key)
         lightRailObject["dest_tc"] = (
             chn + " (循環線)" if route in circularRoutes else chn
         )
+        lightRailObject["dest_sc"] = lightRailObject["dest_tc"]
         lightRailObject["dest_en"] = (
             eng + " (Circular)" if route in circularRoutes else eng
         )
@@ -101,19 +105,15 @@ async def getRouteStop(co="lightRail"):
                 "stop": lightRailId,
                 "name_en": eng,
                 "name_tc": chn,
+                "name_sc": chn,
                 "lat": lat,
-                "long": lng,
+                "lng": lng,
             }
 
-    with open(DATA_DIR / "routeList.lightRail.json", "w", encoding="UTF-8") as f:
-        f.write(
-            json.dumps(
-                [route for route in routeList.values() if len(route["stops"]) > 0],
-                ensure_ascii=False,
-            )
-        )
-    with open(DATA_DIR / "stopList.lightRail.json", "w", encoding="UTF-8") as f:
-        f.write(json.dumps(stopList, ensure_ascii=False))
+    routes: list[ProviderRoute] = [
+        route for route in routeList.values() if len(route["stops"]) > 0
+    ]
+    dump_provider_data(co, routes, stopList)
 
 
 if __name__ == "__main__":

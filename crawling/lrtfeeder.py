@@ -3,11 +3,11 @@
 
 import asyncio
 import csv
-import json
 import logging
 
 import httpx
-from crawl_utils import emitRequest
+from crawl_utils import dump_provider_data, emitRequest
+from schemas import ProviderRoute, ProviderStop
 from utils import DATA_DIR
 
 BASE_URL = "https://opendata.mtr.com.hk/data"
@@ -28,7 +28,7 @@ async def getRouteStop(co="lrtfeeder"):
         return
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
     routeList = {}
-    stopList = {}
+    stopList: dict[str, ProviderStop] = {}
 
     r = await emitRequest(routes_url(), a_client)
     r.encoding = "utf-8"
@@ -43,19 +43,29 @@ async def getRouteStop(co="lrtfeeder"):
             if len(referenceId.split("-")) == 1
             else ((int)(referenceId.split("-")[1]) + 1)
         )
-        start = {"tc": chn.split("至")[0], "en": eng.split(" to ")[0]}
-        end = {"tc": chn.split("至")[1], "en": eng.split(" to ")[1]}
+        start = {
+            "tc": chn.split("至")[0],
+            "sc": chn.split("至")[0],
+            "en": eng.split(" to ")[0],
+        }
+        end = {
+            "tc": chn.split("至")[1],
+            "sc": chn.split("至")[1],
+            "en": eng.split(" to ")[1],
+        }
         for bound in ["I", "O"]:
             routeList[referenceId + "_" + bound] = {
                 "route": route,
                 "bound": bound,
                 "service_type": serviceType,
                 "orig_tc": start["tc"] if bound == "O" else end["tc"],
+                "orig_sc": start["sc"] if bound == "O" else end["sc"],
                 "dest_tc": end["tc"] if bound == "O" else start["tc"],
+                "dest_sc": end["sc"] if bound == "O" else start["sc"],
                 "orig_en": start["en"] if bound == "O" else end["en"],
                 "dest_en": end["en"] if bound == "O" else start["en"],
                 "stops": [],
-                "co": "lrtfeeder",
+                "co": co,
             }
 
     # Parse stops
@@ -84,19 +94,15 @@ async def getRouteStop(co="lrtfeeder"):
             "stop": stationId,
             "name_en": name_en,
             "name_tc": name_zh,
+            "name_sc": name_zh,
             "lat": lat,
-            "long": lng,
+            "lng": lng,
         }
 
-    with open(DATA_DIR / "routeList.lrtfeeder.json", "w", encoding="UTF-8") as f:
-        f.write(
-            json.dumps(
-                [route for route in routeList.values() if len(route["stops"]) > 0],
-                ensure_ascii=False,
-            )
-        )
-    with open(DATA_DIR / "stopList.lrtfeeder.json", "w", encoding="UTF-8") as f:
-        f.write(json.dumps(stopList, ensure_ascii=False))
+    routes: list[ProviderRoute] = [
+        route for route in routeList.values() if len(route["stops"]) > 0
+    ]
+    dump_provider_data(co, routes, stopList)
 
 
 if __name__ == "__main__":
