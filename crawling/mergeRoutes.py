@@ -21,6 +21,16 @@ PROVIDERS = [
 ]
 
 
+def loadJson(path):
+    with open(path, "r", encoding="UTF-8") as f:
+        return json.load(f)
+
+
+def writeJson(path, data, **kwargs):
+    with open(path, "w", encoding="UTF-8") as f:
+        json.dump(data, f, ensure_ascii=False, **kwargs)
+
+
 def getRouteObj(
     route,
     co,
@@ -65,12 +75,8 @@ def isGtfsMatch(knownRoute, newRoute):
 
 
 def importRouteListJson(co, route_list, stop_list):
-    _routeList = json.load(
-        open(DATA_DIR / ("routeFareList.%s.cleansed.json" % co), "r", encoding="UTF-8")
-    )
-    _stopList = json.load(
-        open(DATA_DIR / ("stopList.%s.json" % co), "r", encoding="UTF-8")
-    )
+    _routeList = loadJson(DATA_DIR / f"routeFareList.{co}.cleansed.json")
+    _stopList = loadJson(DATA_DIR / f"stopList.{co}.json")
     for stopId, stop in _stopList.items():
         if stopId not in stop_list:
             try:
@@ -220,10 +226,8 @@ def main():
     for route in routeList:
         route["stops"] = {co: stops for co, stops in route["stops"]}
 
-    holidays = json.load(open(DATA_DIR / "holiday.json", "r", encoding="UTF-8"))
-    serviceDayMap = json.load(open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8"))[
-        "serviceDayMap"
-    ]
+    holidays = loadJson(DATA_DIR / "holiday.json")
+    serviceDayMap = loadJson(DATA_DIR / "gtfs.json")["serviceDayMap"]
 
     db = standardizeDict(
         {
@@ -235,13 +239,10 @@ def main():
         }
     )
 
-    with open(DATA_DIR / "routeFareList.mergeRoutes.json", "w", encoding="UTF-8") as f:
-        f.write(json.dumps(db, ensure_ascii=False))
-
-    with open(
-        DATA_DIR / "routeFareList.mergeRoutes.min.json", "w", encoding="UTF-8"
-    ) as f:
-        f.write(json.dumps(db, ensure_ascii=False, separators=(",", ":")))
+    writeJson(DATA_DIR / "routeFareList.mergeRoutes.json", db)
+    writeJson(
+        DATA_DIR / "routeFareList.mergeRoutes.min.json", db, separators=(",", ":")
+    )
 
 
 if __name__ == "__main__":
