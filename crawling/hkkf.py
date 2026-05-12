@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 import asyncio
-import json
 import logging
-import time
 
 import httpx
-from crawl_utils import emitRequest
+from crawl_utils import dump_provider_data, emitRequest
+from schemas import ProviderRoute, ProviderStop
 from utils import DATA_DIR
 
 BASE_URL = "https://www.hkkfeta.com/opendata"
@@ -40,8 +39,8 @@ async def getRouteStop(co):
     ).exists():
         return
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
-    routeList = []
-    stopList = {}
+    routeList: list[ProviderRoute] = []
+    stopList: dict[str, ProviderStop] = {}
 
     r = await emitRequest(routes_url(), a_client)
     apiRoutes = r.json()["data"]
@@ -50,12 +49,6 @@ async def getRouteStop(co):
         stop = (await emitRequest(pier_url(stopId), a_client)).json()["data"]
         apiStops.append(stop)
 
-    with open(DATA_DIR / "gtfs.json", "r", encoding="utf-8") as f:
-        # TODO: remove gtfs if it is unused
-        gtfs = json.load(f)
-        gtfsRoutes = gtfs["routeList"]
-        gtfsStops = gtfs["stopList"]
-
     for apiRoute in apiRoutes:
         orig = parseStop(routes[str(apiRoute["route_id"])][0], apiStops)
         dest = parseStop(routes[str(apiRoute["route_id"])][1], apiStops)
@@ -63,8 +56,10 @@ async def getRouteStop(co):
             {
                 "route": "KF" + str(apiRoute["route_id"]),
                 "orig_tc": orig["name_tc"],
+                "orig_sc": orig["name_sc"],
                 "orig_en": orig["name_en"],
                 "dest_tc": dest["name_tc"],
+                "dest_sc": dest["name_sc"],
                 "dest_en": dest["name_en"],
                 "service_type": 1,
                 "bound": "O",
@@ -79,8 +74,10 @@ async def getRouteStop(co):
             {
                 "route": "KF" + str(apiRoute["route_id"]),
                 "orig_tc": dest["name_tc"],
+                "orig_sc": dest["name_sc"],
                 "orig_en": dest["name_en"],
                 "dest_tc": orig["name_tc"],
+                "dest_sc": orig["name_sc"],
                 "dest_en": orig["name_en"],
                 "service_type": 1,
                 "bound": "I",
@@ -97,15 +94,12 @@ async def getRouteStop(co):
             "stop": "KF" + str(apiStop["pier_id"]),
             "name_en": apiStop["name_en"],
             "name_tc": apiStop["name_tc"],
+            "name_sc": apiStop["name_sc"],
             "lat": apiStop["lat"],
-            "long": apiStop["long"],
+            "lng": apiStop["long"],
         }
 
-    with open(DATA_DIR / "routeList.hkkf.json", "w", encoding="utf-8") as f:
-        f.write(json.dumps(routeList, ensure_ascii=False))
-
-    with open(DATA_DIR / "stopList.hkkf.json", "w", encoding="utf-8") as f:
-        f.write(json.dumps(stopList, ensure_ascii=False))
+    dump_provider_data(co, routeList, stopList)
 
 
 if __name__ == "__main__":
