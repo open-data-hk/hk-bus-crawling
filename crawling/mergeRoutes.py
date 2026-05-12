@@ -194,26 +194,6 @@ def smartUnique():
     return _routeList
 
 
-importRouteListJson("kmb")
-importRouteListJson("ctb")
-importRouteListJson("nlb")
-importRouteListJson("lrtfeeder")
-importRouteListJson("gmb")
-importRouteListJson("lightRail")
-importRouteListJson("mtr")
-importRouteListJson("sunferry")
-importRouteListJson("fortuneferry")
-importRouteListJson("hkkf")
-routeList = smartUnique()
-for route in routeList:
-    route["stops"] = {co: stops for co, stops in route["stops"]}
-
-holidays = json.load(open(DATA_DIR / "holiday.json", "r", encoding="UTF-8"))
-serviceDayMap = json.load(open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8"))[
-    "serviceDayMap"
-]
-
-
 def standardizeDict(d):
     return {
         key: value if not isinstance(value, dict) else standardizeDict(value)
@@ -221,18 +201,46 @@ def standardizeDict(d):
     }
 
 
-db = standardizeDict(
-    {
-        "routeList": {getRouteId(v): v for v in routeList},
-        "stopList": stopList,
-        "stopMap": stopMap,
-        "holidays": holidays,
-        "serviceDayMap": serviceDayMap,
-    }
-)
+def main():
+    global routeList
 
-with open(DATA_DIR / "routeFareList.mergeRoutes.json", "w", encoding="UTF-8") as f:
-    f.write(json.dumps(db, ensure_ascii=False))
+    importRouteListJson("kmb")
+    importRouteListJson("ctb")
+    importRouteListJson("nlb")
+    importRouteListJson("lrtfeeder")
+    importRouteListJson("gmb")
+    importRouteListJson("lightRail")
+    importRouteListJson("mtr")
+    importRouteListJson("sunferry")
+    importRouteListJson("fortuneferry")
+    importRouteListJson("hkkf")
+    routeList = smartUnique()
+    for route in routeList:
+        route["stops"] = {co: stops for co, stops in route["stops"]}
 
-with open(DATA_DIR / "routeFareList.mergeRoutes.min.json", "w", encoding="UTF-8") as f:
-    f.write(json.dumps(db, ensure_ascii=False, separators=(",", ":")))
+    holidays = json.load(open(DATA_DIR / "holiday.json", "r", encoding="UTF-8"))
+    serviceDayMap = json.load(open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8"))[
+        "serviceDayMap"
+    ]
+
+    db = standardizeDict(
+        {
+            "routeList": {getRouteId(v): v for v in routeList},
+            "stopList": stopList,
+            "stopMap": stopMap,
+            "holidays": holidays,
+            "serviceDayMap": serviceDayMap,
+        }
+    )
+
+    with open(DATA_DIR / "routeFareList.mergeRoutes.json", "w", encoding="UTF-8") as f:
+        f.write(json.dumps(db, ensure_ascii=False))
+
+    with open(
+        DATA_DIR / "routeFareList.mergeRoutes.min.json", "w", encoding="UTF-8"
+    ) as f:
+        f.write(json.dumps(db, ensure_ascii=False, separators=(",", ":")))
+
+
+if __name__ == "__main__":
+    main()
