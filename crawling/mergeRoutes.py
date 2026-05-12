@@ -104,6 +104,13 @@ def isSameRouteCandidate(co, co_route, w_route):
     return True
 
 
+def isOrigDestSameEnName(co_route, w_route):
+    return (
+        co_route["orig_en"].upper() == w_route["orig"]["en"].upper()
+        and co_route["dest_en"].upper() == w_route["dest"]["en"].upper()
+    )
+
+
 def importRouteListJson(co, whole_route_list, whole_stop_list):
     co_route_list = loadJson(DATA_DIR / f"routeFareList.{co}.cleansed.json")
     co_stop_list = loadJson(DATA_DIR / f"stopList.{co}.json")
@@ -142,10 +149,7 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
                 found = True
                 w_route["stops"].append((co, co_route["stops"]))
                 w_route["bound"][co] = co_route["bound"]
-            elif (
-                co_route["orig_en"].upper() == w_route["orig"]["en"].upper()
-                and co_route["dest_en"].upper() == w_route["dest"]["en"].upper()
-            ):
+            elif isOrigDestSameEnName(co_route, w_route):
                 special_type = int(w_route["serviceType"]) + 1
                 if co_route["route"] == "606" and co_route["dest_tc"].startswith(
                     "彩雲"
