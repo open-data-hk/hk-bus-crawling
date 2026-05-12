@@ -6,8 +6,10 @@ import os
 import httpx
 
 try:
+    from .schemas import ProviderRoute, ProviderStop
     from .utils import DATA_DIR
 except ImportError:
+    from schemas import ProviderRoute, ProviderStop
     from utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
@@ -56,3 +58,14 @@ def store_version(key: str, version: str):
     version_dict = dict(sorted(version_dict.items()))
     with open(DATA_DIR / "0versions.json", "w", encoding="UTF-8") as f:
         json.dump(version_dict, f)
+
+
+def dump_provider_data(
+    co: str,
+    route_list: list[ProviderRoute],
+    stop_list: dict[str, ProviderStop],
+) -> None:
+    with open(DATA_DIR / f"routeList.{co}.json", "w", encoding="UTF-8") as f:
+        json.dump(route_list, f, ensure_ascii=False)
+    with open(DATA_DIR / f"stopList.{co}.json", "w", encoding="UTF-8") as f:
+        json.dump(stop_list, f, ensure_ascii=False)
