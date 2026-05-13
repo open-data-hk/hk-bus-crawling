@@ -127,8 +127,9 @@ def get_stop_group(
         return nearby_stops
 
     stop_group: StopGroup = []
-    stop_list_entries = search_nearby_stops(stop_id, set())
+    stop_list_entries = search_nearby_stops(stop_id, {stop_id})
     discovered_stop_ids = {entry["id"] for entry in stop_list_entries}
+    discovered_stop_ids.add(stop_id)
 
     # recursively search for nearby stops within thresholds (distance and bearing)
     # stop searching when no new stops are found within range, or when stop
@@ -143,9 +144,7 @@ def get_stop_group(
             discovered_stop_ids.update(entry["id"] for entry in new_entries)
             stop_list_entries.extend(new_entries)
 
-    # to reduce size of routeFareList.min.json, excl current stop_id from
-    # final output stopMap
-    return [stop for stop in stop_group if stop[1] != stop_id]
+    return stop_group
     # return stop_group
 
 
