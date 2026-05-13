@@ -48,6 +48,14 @@ class GtfsStop(TypedDict):
     lng: float
 
 
+class StopAlignmentEntry(TypedDict):
+    """One exported stop-alignment row between a GTFS and operator route."""
+
+    status: str
+    gtfs_stop: str | None
+    co_stop: str | None
+
+
 class Route(TypedDict, total=False):
     """A bus/ferry route as returned by an operator's API, optionally enriched with GTFS data."""
 
@@ -66,6 +74,8 @@ class Route(TypedDict, total=False):
     virtual: bool
     found: bool
     gtfs: list[str]
+    gtfs_stops: list[str]
+    stop_alignment: list[StopAlignmentEntry]
     fares: str | None
     freq: dict[str, Any]
     jt: int
@@ -742,6 +752,81 @@ def printStopMatches(
     print()
 
 
+def build_stop_alignment(
+    co_stop_ids: list[str],
+    gtfs_stop_ids: list[str],
+    stop_matches: list[StopMatch],
+) -> list[StopAlignmentEntry]:
+    """Build an ordered export of matched, GTFS-only, and operator-only stops."""
+    alignment: list[StopAlignmentEntry] = []
+    gtfs_idx = 0
+    co_idx = 0
+
+    for matched_gtfs_idx, matched_co_idx in stop_matches:
+        while gtfs_idx < matched_gtfs_idx:
+            alignment.append(
+                {
+                    "status": "extra_gtfs",
+                    "gtfs_stop": gtfs_stop_ids[gtfs_idx],
+                    "co_stop": None,
+                }
+            )
+            gtfs_idx += 1
+        while co_idx < matched_co_idx:
+            alignment.append(
+                {
+                    "status": "extra_operator",
+                    "gtfs_stop": None,
+                    "co_stop": co_stop_ids[co_idx],
+                }
+            )
+            co_idx += 1
+
+        alignment.append(
+            {
+                "status": "matched",
+                "gtfs_stop": gtfs_stop_ids[matched_gtfs_idx],
+                "co_stop": co_stop_ids[matched_co_idx],
+            }
+        )
+        gtfs_idx = matched_gtfs_idx + 1
+        co_idx = matched_co_idx + 1
+
+    while gtfs_idx < len(gtfs_stop_ids):
+        alignment.append(
+            {
+                "status": "extra_gtfs",
+                "gtfs_stop": gtfs_stop_ids[gtfs_idx],
+                "co_stop": None,
+            }
+        )
+        gtfs_idx += 1
+    while co_idx < len(co_stop_ids):
+        alignment.append(
+            {
+                "status": "extra_operator",
+                "gtfs_stop": None,
+                "co_stop": co_stop_ids[co_idx],
+            }
+        )
+        co_idx += 1
+
+    return alignment
+
+
+def add_gtfs_stop_alignment(
+    route: Route,
+    co_stop_ids: list[str],
+    gtfs_stop_ids: list[str],
+    stop_matches: list[StopMatch],
+) -> None:
+    """Attach full GTFS stops and alignment metadata to an exported route."""
+    route["gtfs_stops"] = gtfs_stop_ids
+    route["stop_alignment"] = build_stop_alignment(
+        co_stop_ids, gtfs_stop_ids, stop_matches
+    )
+
+
 def match_co_routes_with_gtfs(co: str) -> None:
     """Match and enrich one operator's routes with GTFS fares, frequencies, and aligned stops.
 
@@ -894,6 +979,12 @@ def match_co_routes_with_gtfs(co: str) -> None:
                             co_route["stops"][j] for i, j in ret
                         ]
                         route_candidate["gtfs"] = [gtfs_id]
+                        add_gtfs_stop_alignment(
+                            route_candidate,
+                            co_route["stops"],
+                            gtfs_route_seq_stops,
+                            ret,
+                        )
                         co_route["found"] = True
                         matched_co_route_ids.add(id(co_route))
                     else:
@@ -927,6 +1018,12 @@ def match_co_routes_with_gtfs(co: str) -> None:
                             "2" if "found" in co_route else "1"
                         )
                         route_candidate["gtfs"] = [gtfs_id]
+                        add_gtfs_stop_alignment(
+                            route_candidate,
+                            co_route["stops"],
+                            gtfs_route_seq_stops,
+                            ret,
+                        )
                         # mark the route has mapped to GTFS, mainly for ctb routes
                         co_route["found"] = True
                         matched_co_route_ids.add(id(co_route))
