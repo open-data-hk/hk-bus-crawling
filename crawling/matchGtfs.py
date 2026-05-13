@@ -4,7 +4,6 @@ import json
 import sys
 from typing import Any, TypedDict
 
-from gtfs_fare import get_fare
 from haversine import haversine
 from utils import DATA_DIR
 
@@ -59,7 +58,7 @@ class Route(TypedDict, total=False):
     virtual: bool
     found: bool
     gtfs: list[str]
-    fares: list[float] | None
+    fares: str | None
     freq: dict[str, Any]
     jt: int
 
@@ -71,7 +70,18 @@ StopMatch = tuple[int, int]
 BestMatch = tuple[str, float, list[StopMatch], str, list[str], Route]
 
 # GTFS uses "ferry" as the operator code for all ferry companies.
-FERRY_COS: set[str] = {"hkkf"}
+FERRY_COS: set[str] = {"hkkf", "sunferry", "fortuneferry"}
+
+
+# TODO: validate co_route "I" must = gtfs_route "2"
+# Now only used in ferry and gmb
+def get_route_seq_for_provider_route(
+    gtfs_route: dict[str, Any], co_route: Route
+) -> str:
+    """Pick the GTFS sequence that corresponds to an operator route."""
+    if co_route.get("bound") == "I" and "2" in gtfs_route["stops"]:
+        return "2"
+    return "1"
 
 
 def isNameMatch(name_a: str, name_b: str) -> bool:
@@ -398,8 +408,8 @@ def match_co_routes_with_gtfs(co: str) -> None:
     Special handling:
 
     - **GMB / ferry operators** (``sunferry``, ``fortuneferry``, ``hkkf``):
-      Fare is read directly from GTFS via a pre-existing GTFS ID field on
-      each route rather than going through the DP matcher.
+      Fare is read directly from GTFS via a pre-existing GTFS
+      ID field on each route rather than going through the DP matcher.
     - **MTR**: GTFS-derived candidates are NOT appended to the original route
       list to avoid duplicates; only existing entries are enriched.
     - **HKKF**: Routes are matched by terminal name prefix rather than route
@@ -443,26 +453,13 @@ def match_co_routes_with_gtfs(co: str) -> None:
         if co == "gmb":  # handle for gmb
             for co_route in co_routes:
                 if co_route["gtfs_id"] == gtfs_id:
-                    # it assumes fare of all stops are the same
-                    # TODO: inspect the validity of data
-                    # there should be sectional fare
-                    flat_fare = get_fare(
-                        gtfs_route["fares"]["1"], 1, len(gtfs_route["stops"]["1"])
-                    )
-                    co_route["fares"] = [
-                        flat_fare for _ in range(len(co_route["stops"]) - 1)
-                    ]
+                    route_seq = get_route_seq_for_provider_route(gtfs_route, co_route)
+                    co_route["fares"] = gtfs_route["fares"].get(route_seq)
         elif co in ["sunferry", "fortuneferry"]:
             for co_route in co_routes:
                 if co_route["gtfs_id"] == gtfs_id:
-                    # it assumes fare of all stops are the same
-                    # TODO: inspect the validity of data
-                    flat_fare = get_fare(
-                        gtfs_route["fares"]["1"], 1, len(gtfs_route["stops"]["1"])
-                    )
-                    co_route["fares"] = [
-                        flat_fare for _ in range(len(co_route["stops"]) - 1)
-                    ]
+                    route_seq = get_route_seq_for_provider_route(gtfs_route, co_route)
+                    co_route["fares"] = gtfs_route["fares"].get(route_seq)
         # handle for other companies
         else:
             for route_seq, gtfs_route_seq_stops in gtfs_route["stops"].items():
@@ -526,14 +523,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
                         and "virtual" not in co_route
                     ):
                         _fare_csv = gtfs_route["fares"].get(route_seq, "")
-                        route_candidate["fares"] = (
-                            [
-                                get_fare(_fare_csv, i + 1, ret[-1][0] + 1)
-                                for i, _ in ret[:-1]
-                            ]
-                            if _fare_csv
-                            else None
-                        )
+                        route_candidate["fares"] = _fare_csv if _fare_csv else None
                         route_candidate["freq"] = gtfs_route["freq"][route_seq]
                         route_candidate["jt"] = gtfs_route["jt"]
                         route_candidate["co"] = (
@@ -551,14 +541,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
                             co_route["stops"][j] for i, j in ret
                         ]
                         _fare_csv = gtfs_route["fares"].get(route_seq, "")
-                        route_candidate["fares"] = (
-                            [
-                                get_fare(_fare_csv, i + 1, ret[-1][0] + 1)
-                                for i, _ in ret[:-1]
-                            ]
-                            if _fare_csv
-                            else None
-                        )
+                        route_candidate["fares"] = _fare_csv if _fare_csv else None
                         route_candidate["freq"] = gtfs_route["freq"][route_seq]
                         route_candidate["jt"] = gtfs_route["jt"]
                         route_candidate["co"] = gtfs_route["co"]
