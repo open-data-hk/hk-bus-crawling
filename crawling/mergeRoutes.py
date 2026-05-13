@@ -46,9 +46,10 @@ def getRouteObj(
     jt,
     nlbId,
     gtfsId,
+    stopAlignment=None,
     serviceType=1,
 ):
-    return {
+    route_obj = {
         "route": route,
         "co": co,
         "stops": stops,
@@ -64,6 +65,14 @@ def getRouteObj(
         "gtfsId": gtfsId,
         "seq": seq,
     }
+    if stopAlignment:
+        route_obj["stopAlignment"] = stopAlignment
+    return route_obj
+
+
+def addStopAlignmentToRoute(route, co, co_route):
+    if "stop_alignment" in co_route:
+        route.setdefault("stopAlignment", {})[co] = co_route["stop_alignment"]
 
 
 def isGtfsMatch(knownRoute, newRoute):
@@ -160,6 +169,7 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
                 found = True
                 w_route["stops"].append((co, co_route["stops"]))
                 w_route["bound"][co] = co_route["bound"]
+                addStopAlignmentToRoute(w_route, co, co_route)
             elif isOrigDestSameEnName(co_route, w_route):
                 special_type = int(w_route["serviceType"]) + 1
                 if co_route["route"] == "606" and co_route["dest_tc"].startswith(
@@ -183,6 +193,11 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
                     jt=co_route.get("jt", None),
                     nlbId=co_route.get("id", None),
                     gtfsId=co_route.get("gtfs_id", co_route.get("gtfs", [None])[0]),
+                    stopAlignment=(
+                        {co: co_route["stop_alignment"]}
+                        if "stop_alignment" in co_route
+                        else None
+                    ),
                     seq=len(co_route["stops"]),
                 )
             )
@@ -233,6 +248,10 @@ def smartUnique(route_list):
         for found in founds:
             route_i["co"].extend(route_list[found]["co"])
             route_i["stops"].extend(route_list[found]["stops"])
+            if "stopAlignment" in route_list[found]:
+                route_i.setdefault("stopAlignment", {}).update(
+                    route_list[found]["stopAlignment"]
+                )
             route_list[found]["skip"] = True
 
         # append return array
