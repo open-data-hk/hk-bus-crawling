@@ -184,8 +184,6 @@ def get_stop_bearings(route_stops: list[RouteStop]) -> list[float]:
     bearing_groups: list[list[float]] = []
 
     for bearing in bearings:
-        if bearing == -1:
-            continue
         if not bearing_groups:
             bearing_groups.append([bearing])
             continue
