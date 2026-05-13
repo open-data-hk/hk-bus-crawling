@@ -753,6 +753,7 @@ def printStopMatches(
     print()
 
 
+# TODO: compress the alignment result
 def build_stop_alignment(
     co_stop_ids: list[str],
     co_stops: dict[str, CoStop],
