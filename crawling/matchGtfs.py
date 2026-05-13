@@ -73,6 +73,10 @@ class Route(TypedDict, total=False):
     stops: list[str]
     gtfs_id: str
     virtual: bool
+    _source_route_ids: list[int]
+    _omit_from_export: bool
+    circular_return_point: dict[str, str]
+    circular_sections: list[dict[str, Any]]
     found: bool
     gtfs: list[str]
     gtfs_stops: list[str]
@@ -251,7 +255,10 @@ def mark_gtfs_route_seq_matched(
     if "_route" not in gtfs_route:
         gtfs_route["_route"] = {}
     gtfs_route["_route"].setdefault(route_seq, {})
-    gtfs_route["_route"][route_seq][co] = co_route.copy()
+    route_for_log = co_route.copy()
+    route_for_log.pop("_source_route_ids", None)
+    route_for_log.pop("_omit_from_export", None)
+    gtfs_route["_route"][route_seq][co] = route_for_log
 
 
 def format_gtfs_route_for_log(
@@ -327,6 +334,8 @@ def get_route_seq_for_provider_route(
     gtfs_route: dict[str, Any], co_route: Route
 ) -> str:
     """Pick the GTFS sequence that corresponds to an operator route."""
+    if gtfs_route.get("is_circular"):
+        return "1"
     if co_route.get("bound") == "I" and "2" in gtfs_route["stops"]:
         return "2"
     return "1"
@@ -643,6 +652,24 @@ def mergeRouteAsCircularRoute(routeA: Route, routeB: Route) -> Route:
         >>> merged["bound"] == routeA["bound"] + routeB["bound"]
         True
     """
+    return_point = {
+        "en": routeA["dest_en"],
+        "tc": routeA["dest_tc"],
+        "sc": routeA["dest_sc"],
+    }
+    circular_sections = [
+        {
+            "bound": route["bound"],
+            "orig_en": route["orig_en"],
+            "orig_tc": route["orig_tc"],
+            "orig_sc": route["orig_sc"],
+            "dest_en": route["dest_en"],
+            "dest_tc": route["dest_tc"],
+            "dest_sc": route["dest_sc"],
+            "stops": route["stops"],
+        }
+        for route in [routeA, routeB]
+    ]
     return {
         "co": routeA["co"],
         "route": routeA["route"],
@@ -656,6 +683,9 @@ def mergeRouteAsCircularRoute(routeA: Route, routeB: Route) -> Route:
         "service_type": routeA["service_type"],
         "stops": routeA["stops"] + routeB["stops"],
         "virtual": True,
+        "circular_return_point": return_point,
+        "circular_sections": circular_sections,
+        "_source_route_ids": [id(routeA), id(routeB)],
     }
 
 
@@ -924,11 +954,20 @@ def match_co_routes_with_gtfs(co: str) -> None:
         else:
             for route_seq, gtfs_route_seq_stops in gtfs_route["stops"].items():
                 best_match: BestMatch = ("-1", INFINITY_DIST, [], "", [], {})
-                virtual_routes = [
-                    virtual_route
-                    for route_no in get_co_route_nos_for_gtfs_route(co, gtfs_route)
-                    for virtual_route in getVirtualCircularRoutes(co_routes, route_no)
-                ]
+                virtual_routes = []
+                if gtfs_route.get("is_circular"):
+                    virtual_routes = [
+                        virtual_route
+                        for route_no in get_co_route_nos_for_gtfs_route(co, gtfs_route)
+                        for virtual_route in getVirtualCircularRoutes(
+                            co_routes, route_no
+                        )
+                    ]
+                    if not virtual_routes:
+                        logger.info(
+                            "Circular GTFS route has no virtual operator candidates: %s",
+                            format_gtfs_route_for_log(gtfs_id, gtfs_route, [route_seq]),
+                        )
                 for co_route in co_routes + virtual_routes:
                     matching_gtfs_co = get_matching_gtfs_co(co, co_route, gtfs_route)
                     if matching_gtfs_co is not None or (
@@ -974,8 +1013,27 @@ def match_co_routes_with_gtfs(co: str) -> None:
                 best_match_avgDist = best_match[1]
                 if best_match_avgDist < DIST_DIFF:
                     _, _, ret, route_seq, gtfs_route_seq_stops, co_route = best_match
+                    if co_route.get("virtual"):
+                        logger.info(
+                            "Matched circular GTFS route with virtual operator route: %s",
+                            format_gtfs_route_for_log(gtfs_id, gtfs_route, [route_seq]),
+                        )
+                        source_route_ids = co_route.get("_source_route_ids", [])
+                        matched_co_route_ids.update(source_route_ids)
+                        for source_route in co_routes:
+                            if id(source_route) in source_route_ids:
+                                source_route["_omit_from_export"] = True
+                                logger.warning(
+                                    "Matched split operator route via virtual circular route: %s %s matched_gtfs=%s",
+                                    co,
+                                    format_co_route_for_log(source_route),
+                                    format_gtfs_route_for_log(
+                                        gtfs_id, gtfs_route, [route_seq]
+                                    ),
+                                )
 
                     route_candidate = co_route.copy()
+                    route_candidate.pop("_source_route_ids", None)
                     if (
                         (
                             len(ret) == len(co_route["stops"])
@@ -1110,7 +1168,10 @@ def match_co_routes_with_gtfs(co: str) -> None:
         co_routes.extend(route_candidates)
     # skipping routes that just partially mapped to GTFS
     co_routes = [
-        route for route in co_routes if "found" not in route or "fares" in route
+        route
+        for route in co_routes
+        if not route.get("_omit_from_export")
+        and ("found" not in route or "fares" in route)
     ]
 
     with open(DATA_DIR / ("routeFareList.%s.json" % co), "w", encoding="UTF-8") as f:
