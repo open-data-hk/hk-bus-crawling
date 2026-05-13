@@ -136,6 +136,7 @@ def load_unmatched_co_route_exemptions() -> dict[str, set[str] | None]:
 
 
 UNMATCHED_CO_ROUTE_EXEMPTIONS = load_unmatched_co_route_exemptions()
+UNMATCHED_OPERATOR_ROUTES_BY_GTFS_KEY: dict[RouteMatchKey, list[tuple[str, Route]]] = {}
 
 # Routes that are known to exist in GTFS but not in an operator feed.
 UNMATCHED_GTFS_ROUTE_EXEMPTIONS: dict[str, set[str] | None] = {}
@@ -248,9 +249,9 @@ def format_gtfs_route_for_log(
     )
 
 
-def log_unmatched_gtfs_routes() -> None:
-    """Log GTFS route sequences that were not matched by any provider."""
-    unmatched_gtfs_routes = sorted(
+def get_unmatched_gtfs_routes() -> list[tuple[str, dict[str, Any], list[str]]]:
+    """Return GTFS route sequences that were not matched by any provider."""
+    return sorted(
         [
             (
                 gtfs_id,
@@ -275,6 +276,27 @@ def log_unmatched_gtfs_routes() -> None:
         ],
         key=lambda item: (",".join(item[1]["co"]), int(item[0])),
     )
+
+
+def log_unmatched_routes_in_both_feeds() -> None:
+    """Log route numbers that failed to match in both operator and GTFS feeds."""
+    for gtfs_id, gtfs_route, route_seqs in get_unmatched_gtfs_routes():
+        for co in gtfs_route["co"]:
+            unmatched_operator_routes = UNMATCHED_OPERATOR_ROUTES_BY_GTFS_KEY.get(
+                (co, gtfs_route["route"]), []
+            )
+            for operator_co, co_route in unmatched_operator_routes:
+                logger.warning(
+                    "Unmatched in both operator and GTFS: operator=%s %s gtfs=%s",
+                    operator_co,
+                    format_co_route_for_log(co_route),
+                    format_gtfs_route_for_log(gtfs_id, gtfs_route, route_seqs),
+                )
+
+
+def log_unmatched_gtfs_routes() -> None:
+    """Log GTFS route sequences that were not matched by any provider."""
+    unmatched_gtfs_routes = get_unmatched_gtfs_routes()
     for gtfs_id, gtfs_route, route_seqs in unmatched_gtfs_routes:
         logger.warning(
             "Unmatched GTFS route: %s %s",
@@ -825,6 +847,10 @@ def match_co_routes_with_gtfs(co: str) -> None:
         )
     ]
     for co_route in unmatched_co_routes:
+        for gtfs_match_key in get_gtfs_match_keys(co, co_route["route"]):
+            UNMATCHED_OPERATOR_ROUTES_BY_GTFS_KEY.setdefault(gtfs_match_key, []).append(
+                (co, co_route)
+            )
         logger.warning(
             "Unmatched operator route: %s %s",
             co,
@@ -863,6 +889,7 @@ match_co_routes_with_gtfs("mtr")
 match_co_routes_with_gtfs("sunferry")
 match_co_routes_with_gtfs("fortuneferry")
 match_co_routes_with_gtfs("hkkf")
+log_unmatched_routes_in_both_feeds()
 log_unmatched_gtfs_routes()
 
 """
