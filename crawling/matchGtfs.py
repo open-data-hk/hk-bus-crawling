@@ -138,28 +138,31 @@ def format_gtfs_route_for_log(
 
 def log_unmatched_gtfs_routes() -> None:
     """Log GTFS route sequences that were not matched by any provider."""
-    unmatched_gtfs_routes = [
-        (
-            gtfs_id,
-            gtfs_route,
-            [
-                route_seq
-                for route_seq in gtfs_route["stops"]
-                if route_seq not in gtfs_route.get("_matched_route_seqs", [])
-            ],
-        )
-        for gtfs_id, gtfs_route in gtfs_routes.items()
-        if any(
-            route_seq not in gtfs_route.get("_matched_route_seqs", [])
-            for route_seq in gtfs_route["stops"]
-        )
-        and not any(
-            is_unmatched_route_exempt(
-                co, gtfs_route["route"], UNMATCHED_GTFS_ROUTE_EXEMPTIONS
+    unmatched_gtfs_routes = sorted(
+        [
+            (
+                gtfs_id,
+                gtfs_route,
+                [
+                    route_seq
+                    for route_seq in gtfs_route["stops"]
+                    if route_seq not in gtfs_route.get("_matched_route_seqs", [])
+                ],
             )
-            for co in gtfs_route["co"]
-        )
-    ]
+            for gtfs_id, gtfs_route in gtfs_routes.items()
+            if any(
+                route_seq not in gtfs_route.get("_matched_route_seqs", [])
+                for route_seq in gtfs_route["stops"]
+            )
+            and not any(
+                is_unmatched_route_exempt(
+                    co, gtfs_route["route"], UNMATCHED_GTFS_ROUTE_EXEMPTIONS
+                )
+                for co in gtfs_route["co"]
+            )
+        ],
+        key=lambda item: (",".join(item[1]["co"]), int(item[0])),
+    )
     for gtfs_id, gtfs_route, route_seqs in unmatched_gtfs_routes:
         logger.warning(
             "Unmatched GTFS route: %s %s",
