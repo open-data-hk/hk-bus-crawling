@@ -408,7 +408,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
     Special handling:
 
     - **GMB / ferry operators** (``sunferry``, ``fortuneferry``, ``hkkf``):
-      Fare is read directly from GTFS via a pre-existing GTFS
+      Fare/frequency data is read directly from GTFS via a pre-existing GTFS
       ID field on each route rather than going through the DP matcher.
     - **MTR**: GTFS-derived candidates are NOT appended to the original route
       list to avoid duplicates; only existing entries are enriched.
@@ -455,11 +455,15 @@ def match_co_routes_with_gtfs(co: str) -> None:
                 if co_route["gtfs_id"] == gtfs_id:
                     route_seq = get_route_seq_for_provider_route(gtfs_route, co_route)
                     co_route["fares"] = gtfs_route["fares"].get(route_seq)
+                    co_route["freq"] = gtfs_route["freq"].get(route_seq)
+                    co_route["jt"] = gtfs_route["jt"]
         elif co in ["sunferry", "fortuneferry"]:
             for co_route in co_routes:
                 if co_route["gtfs_id"] == gtfs_id:
                     route_seq = get_route_seq_for_provider_route(gtfs_route, co_route)
                     co_route["fares"] = gtfs_route["fares"].get(route_seq)
+                    co_route["freq"] = gtfs_route["freq"].get(route_seq)
+                    co_route["jt"] = gtfs_route["jt"]
         # handle for other companies
         else:
             for route_seq, gtfs_route_seq_stops in gtfs_route["stops"].items():
