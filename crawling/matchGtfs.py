@@ -924,11 +924,15 @@ def match_co_routes_with_gtfs(co: str) -> None:
         else:
             for route_seq, gtfs_route_seq_stops in gtfs_route["stops"].items():
                 best_match: BestMatch = ("-1", INFINITY_DIST, [], "", [], {})
-                virtual_routes = [
-                    virtual_route
-                    for route_no in get_co_route_nos_for_gtfs_route(co, gtfs_route)
-                    for virtual_route in getVirtualCircularRoutes(co_routes, route_no)
-                ]
+                virtual_routes = []
+                if gtfs_route.get("is_circular"):
+                    virtual_routes = [
+                        virtual_route
+                        for route_no in get_co_route_nos_for_gtfs_route(co, gtfs_route)
+                        for virtual_route in getVirtualCircularRoutes(
+                            co_routes, route_no
+                        )
+                    ]
                 for co_route in co_routes + virtual_routes:
                     matching_gtfs_co = get_matching_gtfs_co(co, co_route, gtfs_route)
                     if matching_gtfs_co is not None or (
