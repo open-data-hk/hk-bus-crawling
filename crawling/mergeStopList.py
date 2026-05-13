@@ -44,6 +44,7 @@ type StopList = dict[str, Stop]
 type StopSeqMapping = dict[str, StopSeqEntry]
 type StopListGrid = dict[str, list[str]]
 type StopGroup = list[list[str]]
+type DistanceCache = dict[tuple[str, str], float]
 
 
 def get_stops_haversine_distance(stop_a: Stop, stop_b: Stop) -> float:
@@ -63,6 +64,7 @@ def get_stop_group(
     stop_list: StopList,
     stop_seq_mapping: StopSeqMapping,
     stop_list_grid: StopListGrid,
+    distance_cache: DistanceCache,
     stop_id: str,
 ) -> StopGroup:
     DISTANCE_THRESHOLD = 50  # in metres
@@ -88,6 +90,16 @@ def get_stop_group(
                 return True
         return False
 
+    def get_cached_stop_distance(stop_id_a: str, stop_id_b: str) -> float:
+        cache_key = (
+            (stop_id_a, stop_id_b) if stop_id_a <= stop_id_b else (stop_id_b, stop_id_a)
+        )
+        if cache_key not in distance_cache:
+            distance_cache[cache_key] = get_stops_haversine_distance(
+                stop_list[stop_id_a], stop_list[stop_id_b]
+            )
+        return distance_cache[cache_key]
+
     def search_nearby_stops(
         target_stop_id: str, excluded_stop_ids: set[str]
     ) -> list[NearbyStopEntry]:
@@ -100,7 +112,7 @@ def get_stop_group(
         for stop_id in stop_list_grid.get(f"{lat}_{lng}", []):
             if (
                 stop_id not in excluded_stop_ids
-                and get_stops_haversine_distance(target_stop, stop_list[stop_id])
+                and get_cached_stop_distance(target_stop_id, stop_id)
                 <= DISTANCE_THRESHOLD
             ):
                 bearings = stop_seq_mapping.get(stop_id, {}).get("bearings", [])
@@ -284,6 +296,7 @@ def merge_stop_list() -> None:
 
     target_stop_list = list(stop_list.items())
     stop_map: dict[str, StopGroup] = {}
+    distance_cache: DistanceCache = {}
     count = 0
     group_count = 0
 
@@ -293,7 +306,7 @@ def merge_stop_list() -> None:
         #     logger.info(f"Processed {count} stops ({group_count} groups) at {(time.time() - start_time) * 1000:.2f}ms")
 
         stop_group = get_stop_group(
-            stop_list, stop_seq_mapping, stop_list_grid, stop_id
+            stop_list, stop_seq_mapping, stop_list_grid, distance_cache, stop_id
         )
         if len(stop_group) > 0:
             group_count += 1
