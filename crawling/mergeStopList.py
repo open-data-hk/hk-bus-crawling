@@ -45,6 +45,7 @@ type StopSeqMapping = dict[str, StopSeqEntry]
 type StopListGrid = dict[str, list[str]]
 type StopGroup = list[list[str]]
 type DistanceCache = dict[tuple[str, str], float]
+type BearingRange = tuple[float, float]
 
 
 def get_stops_haversine_distance(stop_a: Stop, stop_b: Stop) -> float:
@@ -72,17 +73,20 @@ def get_stop_group(
     STOP_LIST_LIMIT = 50  # max number of stops in a group
 
     bearing_targets = stop_seq_mapping.get(stop_id, {}).get("bearings", [])
+    bearing_ranges: list[BearingRange] = []
+    for target in bearing_targets:
+        bearing_min = target - BEARING_THRESHOLD
+        bearing_max = target + BEARING_THRESHOLD
+        if bearing_min < 0:
+            bearing_min += 360
+        if bearing_max > 360:
+            bearing_max -= 360
+        bearing_ranges.append((bearing_min, bearing_max))
 
     def is_bearing_in_range(bearing: float) -> bool:
-        if BEARING_THRESHOLD >= 180 or not bearing_targets:
+        if BEARING_THRESHOLD >= 180 or not bearing_ranges:
             return True
-        for target in bearing_targets:
-            bearing_min = target - BEARING_THRESHOLD
-            bearing_max = target + BEARING_THRESHOLD
-            if bearing_min < 0:
-                bearing_min += 360
-            if bearing_max > 360:
-                bearing_max -= 360
+        for bearing_min, bearing_max in bearing_ranges:
             if bearing_min <= bearing <= bearing_max or (
                 bearing_min > bearing_max
                 and (bearing <= bearing_max or bearing >= bearing_min)
