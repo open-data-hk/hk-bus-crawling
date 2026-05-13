@@ -77,7 +77,11 @@ FERRY_COS: set[str] = {"hkkf", "sunferry", "fortuneferry"}
 # Routes that are known to exist in operator data but not in the GTFS route set.
 # Use None to exempt every route for an operator, or a set of route numbers for
 # targeted exemptions.
-UNMATCHED_CO_ROUTE_EXEMPTIONS: dict[str, set[str] | None] = {}
+UNMATCHED_CO_ROUTE_EXEMPTIONS: dict[str, set[str] | None] = {
+    "mtr": None,
+    "lightRail": None,
+    "kmb": {"PB1", "PB2", "PB3", "PB4", "PB5"},
+}
 
 # Routes that are known to exist in GTFS but not in an operator feed.
 UNMATCHED_GTFS_ROUTE_EXEMPTIONS: dict[str, set[str] | None] = {}
