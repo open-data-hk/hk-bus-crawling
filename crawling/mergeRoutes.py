@@ -309,7 +309,6 @@ def main():
         }
     )
 
-    writeJson(DATA_DIR / "routeFareList.mergeRoutes.json", db)
     writeJson(
         DATA_DIR / "routeFareList.mergeRoutes.min.json", db, separators=(",", ":")
     )

@@ -54,13 +54,13 @@ All four can run in parallel once Layer 2 completes.
 
 | Script | Reads | Output files |
 |--------|-------|-------------|
-| `mergeRoutes.py` | `routeFareList.{co}.cleansed.json`, `stopList.{co}.json`, `holiday.json`, `gtfs.json` | `routeFareList.mergeRoutes.json`, `routeFareList.mergeRoutes.min.json` |
+| `mergeRoutes.py` | `routeFareList.{co}.cleansed.json`, `stopList.{co}.json`, `holiday.json`, `gtfs.json` | `routeFareList.mergeRoutes.min.json` |
 
 ### Layer 7 — Needs `routeFareList.mergeRoutes.min.json`
 
 | Script | Reads | Output files |
 |--------|-------|-------------|
-| `mergeStopList.py` | `routeFareList.mergeRoutes.min.json` | `stopMap.routeStopsSequence.json`, `stopMap.json`, `routeFareList.json`, `routeFareList.min.json`, `routeFareList.alpha.json`, `routeFareList.alpha.min.json` |
+| `mergeStopList.py` | `routeFareList.mergeRoutes.min.json` | `routeFareList.json`, `routeFareList.min.json` |
 
 ### Layer 8 — Needs `routeFareList.min.json`
 
