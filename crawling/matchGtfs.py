@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from pathlib import Path
 from typing import Any, TypedDict
 
 from haversine import haversine
@@ -75,13 +76,40 @@ BestMatch = tuple[str, float, list[StopMatch], str, list[str], Route]
 FERRY_COS: set[str] = {"hkkf", "sunferry", "fortuneferry"}
 
 # Routes that are known to exist in operator data but not in the GTFS route set.
-# Use None to exempt every route for an operator, or a set of route numbers for
-# targeted exemptions.
-UNMATCHED_CO_ROUTE_EXEMPTIONS: dict[str, set[str] | None] = {
-    "mtr": None,
-    "lightRail": None,
-    "kmb": {"PB1", "PB2", "PB3", "PB4", "PB5"},
-}
+# Event-service route lists are keyed by source operator in the data file.
+with open(
+    Path(__file__).resolve().parent / "event_special_bus_routes.json",
+    "r",
+    encoding="UTF-8",
+) as event_special_bus_routes_file:
+    event_special_bus_routes: dict[str, list[str]] = json.load(
+        event_special_bus_routes_file
+    )
+
+
+def load_unmatched_co_route_exemptions() -> dict[str, set[str] | None]:
+    """Load operator routes that are intentionally absent from GTFS."""
+    exemptions: dict[str, set[str] | None] = {
+        "mtr": None,
+        "lightRail": None,
+        "kmb": {"PB1", "PB2", "PB3", "PB4", "PB5"},
+    }
+    for co_key, routes in event_special_bus_routes.items():
+        for co in co_key.split("+"):
+            exemptions.setdefault(co, set())
+            exempt_routes = exemptions[co]
+            if exempt_routes is not None:
+                exempt_routes.update(routes)
+
+    # The current KMB feed includes LWB routes, but keep the source list separate.
+    kmb_exempt_routes = exemptions["kmb"]
+    lwb_exempt_routes = exemptions.get("lwb")
+    if kmb_exempt_routes is not None and lwb_exempt_routes is not None:
+        kmb_exempt_routes.update(lwb_exempt_routes)
+    return exemptions
+
+
+UNMATCHED_CO_ROUTE_EXEMPTIONS = load_unmatched_co_route_exemptions()
 
 # Routes that are known to exist in GTFS but not in an operator feed.
 UNMATCHED_GTFS_ROUTE_EXEMPTIONS: dict[str, set[str] | None] = {}
