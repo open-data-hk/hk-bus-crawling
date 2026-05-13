@@ -73,6 +73,7 @@ class Route(TypedDict, total=False):
     stops: list[str]
     gtfs_id: str
     virtual: bool
+    _source_route_ids: list[int]
     found: bool
     gtfs: list[str]
     gtfs_stops: list[str]
@@ -251,7 +252,9 @@ def mark_gtfs_route_seq_matched(
     if "_route" not in gtfs_route:
         gtfs_route["_route"] = {}
     gtfs_route["_route"].setdefault(route_seq, {})
-    gtfs_route["_route"][route_seq][co] = co_route.copy()
+    route_for_log = co_route.copy()
+    route_for_log.pop("_source_route_ids", None)
+    gtfs_route["_route"][route_seq][co] = route_for_log
 
 
 def format_gtfs_route_for_log(
@@ -658,6 +661,7 @@ def mergeRouteAsCircularRoute(routeA: Route, routeB: Route) -> Route:
         "service_type": routeA["service_type"],
         "stops": routeA["stops"] + routeB["stops"],
         "virtual": True,
+        "_source_route_ids": [id(routeA), id(routeB)],
     }
 
 
@@ -990,8 +994,21 @@ def match_co_routes_with_gtfs(co: str) -> None:
                             "Matched circular GTFS route with virtual operator route: %s",
                             format_gtfs_route_for_log(gtfs_id, gtfs_route, [route_seq]),
                         )
+                        source_route_ids = co_route.get("_source_route_ids", [])
+                        matched_co_route_ids.update(source_route_ids)
+                        for source_route in co_routes:
+                            if id(source_route) in source_route_ids:
+                                logger.info(
+                                    "Matched split operator route via virtual circular route: %s %s matched_gtfs=%s",
+                                    co,
+                                    format_co_route_for_log(source_route),
+                                    format_gtfs_route_for_log(
+                                        gtfs_id, gtfs_route, [route_seq]
+                                    ),
+                                )
 
                     route_candidate = co_route.copy()
+                    route_candidate.pop("_source_route_ids", None)
                     if (
                         (
                             len(ret) == len(co_route["stops"])
