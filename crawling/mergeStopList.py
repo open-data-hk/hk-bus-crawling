@@ -89,7 +89,7 @@ def get_stop_group(
         return False
 
     def search_nearby_stops(
-        target_stop_id: str, excluded_stop_id_list: list[str]
+        target_stop_id: str, excluded_stop_ids: set[str]
     ) -> list[NearbyStopEntry]:
         target_stop = stop_list[target_stop_id]
         # take lat/lng up to 3 decimal places, that's about 100m x 100m square
@@ -99,7 +99,7 @@ def get_stop_group(
         nearby_stops = []
         for stop_id in stop_list_grid.get(f"{lat}_{lng}", []):
             if (
-                stop_id not in excluded_stop_id_list
+                stop_id not in excluded_stop_ids
                 and get_stops_haversine_distance(target_stop, stop_list[stop_id])
                 <= DISTANCE_THRESHOLD
             ):
@@ -114,7 +114,8 @@ def get_stop_group(
         return nearby_stops
 
     stop_group: StopGroup = []
-    stop_list_entries = search_nearby_stops(stop_id, [])
+    stop_list_entries = search_nearby_stops(stop_id, set())
+    discovered_stop_ids = {entry["id"] for entry in stop_list_entries}
 
     # recursively search for nearby stops within thresholds (distance and bearing)
     # stop searching when no new stops are found within range, or when stop
@@ -125,9 +126,9 @@ def get_stop_group(
         stop_group.append([entry["co"], entry["id"]])
         i += 1
         if len(stop_list_entries) < STOP_LIST_LIMIT:
-            stop_list_entries.extend(
-                search_nearby_stops(entry["id"], [e["id"] for e in stop_list_entries])
-            )
+            new_entries = search_nearby_stops(entry["id"], discovered_stop_ids)
+            discovered_stop_ids.update(entry["id"] for entry in new_entries)
+            stop_list_entries.extend(new_entries)
 
     # to reduce size of routeFareList.min.json, excl current stop_id from
     # final output stopMap
