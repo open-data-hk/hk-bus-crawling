@@ -75,6 +75,18 @@ BestMatch = tuple[str, float, list[StopMatch], str, list[str], Route]
 # GTFS uses "ferry" as the operator code for all ferry companies.
 FERRY_COS: set[str] = {"hkkf", "sunferry", "fortuneferry"}
 
+# Operator & route from operator may not be exactly the same as GTFS
+# Hardcode a alias map for matching
+RouteMatchKey = tuple[str, str]
+ROUTE_GTFS_ALIASES: dict[RouteMatchKey, set[RouteMatchKey]] = {
+    ("ctb", "61R"): {("ctb", "NR61")},
+    ("ctb", "88R"): {("ctb", "NR88")},
+    ("lrtfeeder", "K12"): {("kmb", "K12")},
+    ("lrtfeeder", "K14"): {("kmb", "K14")},
+    ("lrtfeeder", "K17"): {("kmb", "K17")},
+    ("lrtfeeder", "K18"): {("kmb", "K18")},
+}
+
 # Routes that are known to exist in operator data but not in the GTFS route set.
 # Event-service route lists are keyed by source operator in the data file.
 with open(
@@ -113,6 +125,64 @@ UNMATCHED_CO_ROUTE_EXEMPTIONS = load_unmatched_co_route_exemptions()
 
 # Routes that are known to exist in GTFS but not in an operator feed.
 UNMATCHED_GTFS_ROUTE_EXEMPTIONS: dict[str, set[str] | None] = {}
+
+
+def get_gtfs_co_for_operator(co: str) -> str:
+    """Return the operator code as represented in GTFS."""
+    return "ferry" if co in FERRY_COS else co
+
+
+def get_gtfs_match_keys(co: str, route_no: str) -> set[RouteMatchKey]:
+    """Return GTFS operator/route pairs that can represent an operator route."""
+    return {
+        (get_gtfs_co_for_operator(co), route_no),
+        *ROUTE_GTFS_ALIASES.get((co, route_no), set()),
+    }
+
+
+def get_co_route_nos_for_gtfs_route(co: str, gtfs_route: dict[str, Any]) -> set[str]:
+    """Return operator route numbers that could match one GTFS route."""
+    route_nos: set[str] = set()
+    if get_gtfs_co_for_operator(co) in gtfs_route["co"]:
+        route_nos.add(gtfs_route["route"])
+
+    for (source_co, source_route_no), aliases in ROUTE_GTFS_ALIASES.items():
+        if source_co != co:
+            continue
+        if any(
+            alias_co in gtfs_route["co"] and alias_route_no == gtfs_route["route"]
+            for alias_co, alias_route_no in aliases
+        ):
+            route_nos.add(source_route_no)
+    return route_nos
+
+
+def can_operator_match_gtfs_route(co: str, gtfs_route: dict[str, Any]) -> bool:
+    """Return whether an operator may have a route matching this GTFS route."""
+    return bool(get_co_route_nos_for_gtfs_route(co, gtfs_route))
+
+
+def is_same_gtfs_route(co: str, co_route: Route, gtfs_route: dict[str, Any]) -> bool:
+    """Return whether an operator route number matches a GTFS route, including aliases."""
+    match_keys = get_gtfs_match_keys(co, co_route["route"])
+    return any(
+        (gtfs_co, gtfs_route["route"]) in match_keys for gtfs_co in gtfs_route["co"]
+    )
+
+
+def get_matching_gtfs_co(
+    co: str, co_route: Route, gtfs_route: dict[str, Any]
+) -> str | None:
+    """Return the GTFS operator code matched by an operator route."""
+    match_keys = get_gtfs_match_keys(co, co_route["route"])
+    return next(
+        (
+            gtfs_co
+            for gtfs_co in gtfs_route["co"]
+            if (gtfs_co, gtfs_route["route"]) in match_keys
+        ),
+        None,
+    )
 
 
 def is_unmatched_route_exempt(
@@ -322,11 +392,13 @@ def matchStopsByDp(
     # Perform DP
     for i, gtfs_stop in enumerate(gtfs_stops):
         for j, co_stop in enumerate(co_stops):
+            gtfs_stop_name = gtfs_stop["stopName"].get(co)
             # if chinese name exactly match, score 0
             # else calculate distance of two stops in meter as score
             dist = (
                 0
-                if co_stop["name_tc"] == gtfs_stop["stopName"][co]["tc"]
+                if gtfs_stop_name is not None
+                and co_stop["name_tc"] == gtfs_stop_name["tc"]
                 else haversine(
                     (float(co_stop["lat"]), float(co_stop["lng"])),
                     (gtfs_stop["lat"], gtfs_stop["lng"]),
@@ -569,11 +641,8 @@ def match_co_routes_with_gtfs(co: str) -> None:
     matched_co_route_ids: set[int] = set()
     # one pass to find matches of co vs gtfs by DP
     for gtfs_id, gtfs_route in gtfs_routes.items():
-        # "co" of ferry services in gtfs are all "ferry"
-        # convert ferry company codes as "ferry" when matching with gtfs
-        gtfs_co = co if co not in FERRY_COS else "ferry"
-        # skip matching if co not match
-        if gtfs_co not in gtfs_route["co"]:
+        # skip matching if this operator cannot map to the GTFS operator/route
+        if not can_operator_match_gtfs_route(co, gtfs_route):
             continue
 
         debug = False and gtfs_id == "1047" and gtfs_route["orig"]["tc"] == "沙田站"
@@ -599,13 +668,14 @@ def match_co_routes_with_gtfs(co: str) -> None:
         else:
             for route_seq, gtfs_route_seq_stops in gtfs_route["stops"].items():
                 best_match: BestMatch = ("-1", INFINITY_DIST, [], "", [], {})
-                for co_route in co_routes + getVirtualCircularRoutes(
-                    co_routes, gtfs_route["route"]
-                ):
-                    if (
-                        co in gtfs_route["co"]
-                        and co_route["route"] == gtfs_route["route"]
-                    ) or (
+                virtual_routes = [
+                    virtual_route
+                    for route_no in get_co_route_nos_for_gtfs_route(co, gtfs_route)
+                    for virtual_route in getVirtualCircularRoutes(co_routes, route_no)
+                ]
+                for co_route in co_routes + virtual_routes:
+                    matching_gtfs_co = get_matching_gtfs_co(co, co_route, gtfs_route)
+                    if matching_gtfs_co is not None or (
                         co == "hkkf"
                         and (
                             (
@@ -622,13 +692,14 @@ def match_co_routes_with_gtfs(co: str) -> None:
                             )
                         )
                     ):
+                        stop_name_co = matching_gtfs_co if matching_gtfs_co else co
                         ret, avgDist = matchStopsByDp(
                             [co_stops[co_stop_id] for co_stop_id in co_route["stops"]],
                             [
                                 gtfs_stops[gtfs_stop_id]
                                 for gtfs_stop_id in gtfs_route_seq_stops
                             ],
-                            co,
+                            stop_name_co,
                             debug,
                         )
                         best_match_avgDist = best_match[1]
