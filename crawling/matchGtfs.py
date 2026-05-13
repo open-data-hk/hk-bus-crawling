@@ -74,6 +74,7 @@ class Route(TypedDict, total=False):
     gtfs_id: str
     virtual: bool
     _source_route_ids: list[int]
+    _omit_from_export: bool
     found: bool
     gtfs: list[str]
     gtfs_stops: list[str]
@@ -254,6 +255,7 @@ def mark_gtfs_route_seq_matched(
     gtfs_route["_route"].setdefault(route_seq, {})
     route_for_log = co_route.copy()
     route_for_log.pop("_source_route_ids", None)
+    route_for_log.pop("_omit_from_export", None)
     gtfs_route["_route"][route_seq][co] = route_for_log
 
 
@@ -998,7 +1000,8 @@ def match_co_routes_with_gtfs(co: str) -> None:
                         matched_co_route_ids.update(source_route_ids)
                         for source_route in co_routes:
                             if id(source_route) in source_route_ids:
-                                logger.info(
+                                source_route["_omit_from_export"] = True
+                                logger.warning(
                                     "Matched split operator route via virtual circular route: %s %s matched_gtfs=%s",
                                     co,
                                     format_co_route_for_log(source_route),
@@ -1143,7 +1146,10 @@ def match_co_routes_with_gtfs(co: str) -> None:
         co_routes.extend(route_candidates)
     # skipping routes that just partially mapped to GTFS
     co_routes = [
-        route for route in co_routes if "found" not in route or "fares" in route
+        route
+        for route in co_routes
+        if not route.get("_omit_from_export")
+        and ("found" not in route or "fares" in route)
     ]
 
     with open(DATA_DIR / ("routeFareList.%s.json" % co), "w", encoding="UTF-8") as f:
