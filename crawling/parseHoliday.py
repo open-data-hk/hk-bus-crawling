@@ -16,7 +16,9 @@ async def main():
             data = r.json()
         with open(DATA_DIR / "holiday.json", "w") as f:
             json.dump(
-                [holiday["dtstart"][0] for holiday in data["vcalendar"][0]["vevent"]], f
+                [holiday["dtstart"][0] for holiday in data["vcalendar"][0]["vevent"]],
+                f,
+                ensure_ascii=False,
             )
         logger.info("Created holiday.json")
     else:
