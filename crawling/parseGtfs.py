@@ -82,6 +82,64 @@ def store_circular_flag(gtfs_route: dict, is_circular: bool) -> None:
     gtfs_route["is_circular"] = gtfs_route.get("is_circular", False) or is_circular
 
 
+def store_circular_evidence(gtfs_route: dict, evidence_type: str, found: bool) -> None:
+    evidence = gtfs_route.setdefault("_circular_evidence", {})
+    evidence[evidence_type] = evidence.get(evidence_type, False) or found
+    store_circular_flag(gtfs_route, found)
+
+
+def has_circular_stop_ids(route_seq_stops: list[str]) -> bool:
+    return len(route_seq_stops) > 1 and route_seq_stops[0] == route_seq_stops[-1]
+
+
+def format_route_for_log(route_id: str, gtfs_route: dict) -> str:
+    return (
+        f"{gtfs_route['route']} gtfs_id={route_id} "
+        f"{gtfs_route['orig'].get('tc', '?')} -> {gtfs_route['dest'].get('tc', '?')}"
+    )
+
+
+def refresh_circular_flags(routeList: dict) -> None:
+    for route_id, gtfs_route in routeList.items():
+        circular_route_seqs = [
+            route_seq
+            for route_seq, route_seq_stops in gtfs_route["stops"].items()
+            if has_circular_stop_ids(route_seq_stops)
+        ]
+        store_circular_evidence(gtfs_route, "stop_id", len(circular_route_seqs) > 0)
+
+        evidence = gtfs_route.get("_circular_evidence", {})
+        if gtfs_route["is_circular"]:
+            evidence_types = [
+                evidence_type for evidence_type, found in evidence.items() if found
+            ]
+            logger.info(
+                "Circular route guessed by %s: %s",
+                ",".join(evidence_types),
+                format_route_for_log(route_id, gtfs_route),
+            )
+
+        if gtfs_route["is_circular"] and len(gtfs_route["stops"]) > 1:
+            logger.warning(
+                "Circular route has more than 1 route_seq: route_seqs=%s %s",
+                ",".join(gtfs_route["stops"].keys()),
+                format_route_for_log(route_id, gtfs_route),
+            )
+
+        if evidence.get("name") and not evidence.get("stop_id"):
+            logger.warning(
+                "Circular evidence mismatch: name=true stop_id=false %s",
+                format_route_for_log(route_id, gtfs_route),
+            )
+        elif evidence.get("stop_id") and not evidence.get("name"):
+            logger.warning(
+                "Circular evidence mismatch: name=false stop_id=true %s",
+                format_route_for_log(route_id, gtfs_route),
+            )
+
+        gtfs_route.pop("_circular_evidence", None)
+
+
 def orig_dest_circular(
     route_long_name: str, lang: Literal["tc", "sc", "en"]
 ) -> tuple[dict, dict, bool]:
@@ -173,7 +231,7 @@ async def parseGtfs():
                 )
                 routeList[route_id]["orig"].update(orig_l)
                 routeList[route_id]["dest"].update(dest_l)
-                store_circular_flag(routeList[route_id], is_circular)
+                store_circular_evidence(routeList[route_id], "name", is_circular)
 
     # parse timetable
     with open(primary_dir / "trips.txt", "r", encoding="UTF-8") as f:
@@ -230,6 +288,8 @@ async def parseGtfs():
             _tmp = list(routeList[route_id]["stops"][bound].items())
             _tmp.sort(key=takeFirst)
             routeList[route_id]["stops"][bound] = [v for k, v in _tmp]
+
+    refresh_circular_flags(routeList)
 
     # TODO: understand what is nameReg
     nameReg = re.compile("\\[(.*)\\] (.*)")
