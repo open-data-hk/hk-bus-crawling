@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from typing import Any, TypedDict
 
@@ -9,6 +10,7 @@ from utils import DATA_DIR
 
 INFINITY_DIST = 1000000
 DIST_DIFF = 600
+logger = logging.getLogger(__name__)
 
 with open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8") as f:
     gtfs = json.load(f)
@@ -71,6 +73,46 @@ BestMatch = tuple[str, float, list[StopMatch], str, list[str], Route]
 
 # GTFS uses "ferry" as the operator code for all ferry companies.
 FERRY_COS: set[str] = {"hkkf", "sunferry", "fortuneferry"}
+
+# Routes that are known to exist in operator data but not in the GTFS route set.
+# Use None to exempt every route for an operator, or a set of route numbers for
+# targeted exemptions.
+UNMATCHED_CO_ROUTE_EXEMPTIONS: dict[str, set[str] | None] = {}
+
+# Routes that are known to exist in GTFS but not in an operator feed.
+UNMATCHED_GTFS_ROUTE_EXEMPTIONS: dict[str, set[str] | None] = {}
+
+
+def is_unmatched_route_exempt(
+    co: str, route_no: str, exemptions: dict[str, set[str] | None]
+) -> bool:
+    """Return whether an unmatched route should be ignored by diagnostics."""
+    if co not in exemptions:
+        return False
+    exempt_routes = exemptions[co]
+    return exempt_routes is None or (
+        exempt_routes is not None and route_no in exempt_routes
+    )
+
+
+def format_co_route_for_log(co_route: Route) -> str:
+    """Format an operator route compactly for unmatched-route diagnostics."""
+    bound = co_route.get("bound", "?")
+    service_type = co_route.get("service_type", "?")
+    return (
+        f"{co_route['route']} bound={bound} service_type={service_type} "
+        f"{co_route.get('orig_tc', '?')} -> {co_route.get('dest_tc', '?')}"
+    )
+
+
+def format_gtfs_route_for_log(
+    gtfs_id: str, route_seq: str, gtfs_route: dict[str, Any]
+) -> str:
+    """Format a GTFS route compactly for unmatched-route diagnostics."""
+    return (
+        f"{gtfs_route['route']} gtfs_id={gtfs_id} seq={route_seq} "
+        f"{gtfs_route['orig']['tc']} -> {gtfs_route['dest']['tc']}"
+    )
 
 
 # TODO: validate co_route "I" must = gtfs_route "2"
@@ -440,6 +482,9 @@ def match_co_routes_with_gtfs(co: str) -> None:
         co_stops = json.load(f)
 
     route_candidates = []
+    matched_co_route_ids: set[int] = set()
+    eligible_gtfs_route_seqs: dict[tuple[str, str], dict[str, Any]] = {}
+    matched_gtfs_route_seqs: set[tuple[str, str]] = set()
     # one pass to find matches of co vs gtfs by DP
     for gtfs_id, gtfs_route in gtfs_routes.items():
         # "co" of ferry services in gtfs are all "ferry"
@@ -448,6 +493,8 @@ def match_co_routes_with_gtfs(co: str) -> None:
         # skip matching if co not match
         if gtfs_co not in gtfs_route["co"]:
             continue
+        for route_seq in gtfs_route["stops"]:
+            eligible_gtfs_route_seqs[(gtfs_id, route_seq)] = gtfs_route
 
         debug = False and gtfs_id == "1047" and gtfs_route["orig"]["tc"] == "沙田站"
         if co == "gmb":  # handle for gmb
@@ -457,6 +504,8 @@ def match_co_routes_with_gtfs(co: str) -> None:
                     co_route["fares"] = gtfs_route["fares"].get(route_seq)
                     co_route["freq"] = gtfs_route["freq"].get(route_seq)
                     co_route["jt"] = gtfs_route["jt"]
+                    matched_co_route_ids.add(id(co_route))
+                    matched_gtfs_route_seqs.add((gtfs_id, route_seq))
         elif co in ["sunferry", "fortuneferry"]:
             for co_route in co_routes:
                 if co_route["gtfs_id"] == gtfs_id:
@@ -464,6 +513,8 @@ def match_co_routes_with_gtfs(co: str) -> None:
                     co_route["fares"] = gtfs_route["fares"].get(route_seq)
                     co_route["freq"] = gtfs_route["freq"].get(route_seq)
                     co_route["jt"] = gtfs_route["jt"]
+                    matched_co_route_ids.add(id(co_route))
+                    matched_gtfs_route_seqs.add((gtfs_id, route_seq))
         # handle for other companies
         else:
             for route_seq, gtfs_route_seq_stops in gtfs_route["stops"].items():
@@ -516,6 +567,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
                 best_match_avgDist = best_match[1]
                 if best_match_avgDist < DIST_DIFF:
                     _, _, ret, route_seq, gtfs_route_seq_stops, co_route = best_match
+                    matched_gtfs_route_seqs.add((gtfs_id, route_seq))
 
                     route_candidate = co_route.copy()
                     if (
@@ -540,6 +592,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
                         ]
                         route_candidate["gtfs"] = [gtfs_id]
                         co_route["found"] = True
+                        matched_co_route_ids.add(id(co_route))
                     else:
                         route_candidate["stops"] = [
                             co_route["stops"][j] for i, j in ret
@@ -573,6 +626,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
                         route_candidate["gtfs"] = [gtfs_id]
                         # mark the route has mapped to GTFS, mainly for ctb routes
                         co_route["found"] = True
+                        matched_co_route_ids.add(id(co_route))
                     route_candidates.append(route_candidate)
                     if "_route" not in gtfs_route:
                         gtfs_route["_route"] = {}
@@ -584,6 +638,36 @@ def match_co_routes_with_gtfs(co: str) -> None:
                         "cannot match any in GTFS",
                         file=sys.stderr,
                     )
+
+    unmatched_co_routes = [
+        co_route
+        for co_route in co_routes
+        if id(co_route) not in matched_co_route_ids
+        and not is_unmatched_route_exempt(
+            co, co_route["route"], UNMATCHED_CO_ROUTE_EXEMPTIONS
+        )
+    ]
+    for co_route in unmatched_co_routes:
+        logger.warning(
+            "Unmatched operator route: %s %s",
+            co,
+            format_co_route_for_log(co_route),
+        )
+
+    unmatched_gtfs_route_seqs = [
+        (gtfs_id, route_seq, gtfs_route)
+        for (gtfs_id, route_seq), gtfs_route in eligible_gtfs_route_seqs.items()
+        if (gtfs_id, route_seq) not in matched_gtfs_route_seqs
+        and not is_unmatched_route_exempt(
+            co, gtfs_route["route"], UNMATCHED_GTFS_ROUTE_EXEMPTIONS
+        )
+    ]
+    for gtfs_id, route_seq, gtfs_route in unmatched_gtfs_route_seqs:
+        logger.warning(
+            "Unmatched GTFS route: %s %s",
+            co,
+            format_gtfs_route_for_log(gtfs_id, route_seq, gtfs_route),
+        )
 
     for co_route in co_routes:
         if "gtfs" not in co_route:
