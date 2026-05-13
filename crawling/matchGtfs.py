@@ -75,6 +75,8 @@ class Route(TypedDict, total=False):
     virtual: bool
     _source_route_ids: list[int]
     _omit_from_export: bool
+    circular_return_point: dict[str, str]
+    circular_sections: list[dict[str, Any]]
     found: bool
     gtfs: list[str]
     gtfs_stops: list[str]
@@ -650,6 +652,24 @@ def mergeRouteAsCircularRoute(routeA: Route, routeB: Route) -> Route:
         >>> merged["bound"] == routeA["bound"] + routeB["bound"]
         True
     """
+    return_point = {
+        "en": routeA["dest_en"],
+        "tc": routeA["dest_tc"],
+        "sc": routeA["dest_sc"],
+    }
+    circular_sections = [
+        {
+            "bound": route["bound"],
+            "orig_en": route["orig_en"],
+            "orig_tc": route["orig_tc"],
+            "orig_sc": route["orig_sc"],
+            "dest_en": route["dest_en"],
+            "dest_tc": route["dest_tc"],
+            "dest_sc": route["dest_sc"],
+            "stops": route["stops"],
+        }
+        for route in [routeA, routeB]
+    ]
     return {
         "co": routeA["co"],
         "route": routeA["route"],
@@ -663,6 +683,8 @@ def mergeRouteAsCircularRoute(routeA: Route, routeB: Route) -> Route:
         "service_type": routeA["service_type"],
         "stops": routeA["stops"] + routeB["stops"],
         "virtual": True,
+        "circular_return_point": return_point,
+        "circular_sections": circular_sections,
         "_source_route_ids": [id(routeA), id(routeB)],
     }
 

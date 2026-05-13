@@ -75,6 +75,15 @@ def addStopAlignmentToRoute(route, co, co_route):
         route.setdefault("stopAlignment", {})[co] = co_route["stop_alignment"]
 
 
+def addCircularMetadataToRoute(route, co, co_route):
+    if "circular_return_point" in co_route:
+        route.setdefault("circular_return_point", {})[co] = co_route[
+            "circular_return_point"
+        ]
+    if "circular_sections" in co_route:
+        route.setdefault("circular_sections", {})[co] = co_route["circular_sections"]
+
+
 def isGtfsMatch(knownRoute, newRoute):
     if knownRoute["gtfsId"] is None:
         return True
@@ -170,6 +179,7 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
                 w_route["stops"].append((co, co_route["stops"]))
                 w_route["bound"][co] = co_route["bound"]
                 addStopAlignmentToRoute(w_route, co, co_route)
+                addCircularMetadataToRoute(w_route, co, co_route)
             elif isOrigDestSameEnName(co_route, w_route):
                 special_type = int(w_route["serviceType"]) + 1
                 if co_route["route"] == "606" and co_route["dest_tc"].startswith(
@@ -178,29 +188,29 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
                     print("Yes", special_type)
 
         if not found:
-            whole_route_list.append(
-                getRouteObj(
-                    route=co_route["route"],
-                    co=co_route["co"],
-                    serviceType=co_route.get("service_type", special_type),
-                    stops=[(co, co_route["stops"])],
-                    bound={co: co_route["bound"]},
-                    orig=orig,
-                    dest=dest,
-                    fares=co_route.get("fares", None),
-                    faresHoliday=co_route.get("faresHoliday", None),
-                    freq=co_route.get("freq", None),
-                    jt=co_route.get("jt", None),
-                    nlbId=co_route.get("id", None),
-                    gtfsId=co_route.get("gtfs_id", co_route.get("gtfs", [None])[0]),
-                    stopAlignment=(
-                        {co: co_route["stop_alignment"]}
-                        if "stop_alignment" in co_route
-                        else None
-                    ),
-                    seq=len(co_route["stops"]),
-                )
+            route_obj = getRouteObj(
+                route=co_route["route"],
+                co=co_route["co"],
+                serviceType=co_route.get("service_type", special_type),
+                stops=[(co, co_route["stops"])],
+                bound={co: co_route["bound"]},
+                orig=orig,
+                dest=dest,
+                fares=co_route.get("fares", None),
+                faresHoliday=co_route.get("faresHoliday", None),
+                freq=co_route.get("freq", None),
+                jt=co_route.get("jt", None),
+                nlbId=co_route.get("id", None),
+                gtfsId=co_route.get("gtfs_id", co_route.get("gtfs", [None])[0]),
+                stopAlignment=(
+                    {co: co_route["stop_alignment"]}
+                    if "stop_alignment" in co_route
+                    else None
+                ),
+                seq=len(co_route["stops"]),
             )
+            addCircularMetadataToRoute(route_obj, co, co_route)
+            whole_route_list.append(route_obj)
 
 
 def isMatchStops(stops_a, stops_b, debug=False):
@@ -251,6 +261,14 @@ def smartUnique(route_list):
             if "stopAlignment" in route_list[found]:
                 route_i.setdefault("stopAlignment", {}).update(
                     route_list[found]["stopAlignment"]
+                )
+            if "circular_return_point" in route_list[found]:
+                route_i.setdefault("circular_return_point", {}).update(
+                    route_list[found]["circular_return_point"]
+                )
+            if "circular_sections" in route_list[found]:
+                route_i.setdefault("circular_sections", {}).update(
+                    route_list[found]["circular_sections"]
                 )
             route_list[found]["skip"] = True
 
