@@ -87,6 +87,20 @@ ROUTE_GTFS_ALIASES: dict[RouteMatchKey, set[RouteMatchKey]] = {
     ("lrtfeeder", "K18"): {("kmb", "K18")},
 }
 
+
+def reverse_route_gtfs_aliases(
+    aliases: dict[RouteMatchKey, set[RouteMatchKey]],
+) -> dict[RouteMatchKey, set[RouteMatchKey]]:
+    """Return GTFS route keys to the provider route keys that should own them."""
+    reversed_aliases: dict[RouteMatchKey, set[RouteMatchKey]] = {}
+    for source_key, gtfs_keys in aliases.items():
+        for gtfs_key in gtfs_keys:
+            reversed_aliases.setdefault(gtfs_key, set()).add(source_key)
+    return reversed_aliases
+
+
+REVERSED_ROUTE_GTFS_ALIASES = reverse_route_gtfs_aliases(ROUTE_GTFS_ALIASES)
+
 # Routes that are known to exist in operator data but not in the GTFS route set.
 # Event-service route lists are keyed by source operator in the data file.
 with open(
@@ -780,12 +794,27 @@ def match_co_routes_with_gtfs(co: str) -> None:
                     route_candidates.append(route_candidate)
                     mark_gtfs_route_seq_matched(gtfs_route, route_seq, co, co_route)
                 elif co in gtfs_route["co"]:
-                    print(
-                        co,
-                        gtfs_route["route"],
-                        "cannot match any in GTFS",
-                        file=sys.stderr,
+                    alias_owners = REVERSED_ROUTE_GTFS_ALIASES.get(
+                        (co, gtfs_route["route"])
                     )
+                    if alias_owners:
+                        alias_owner_names = ", ".join(
+                            sorted(source_co for source_co, _ in alias_owners)
+                        )
+                        print(
+                            co.upper(),
+                            gtfs_route["route"],
+                            f"from GTFS not found in operator {co.upper()} routes, "
+                            f"but found in {alias_owner_names}",
+                            file=sys.stderr,
+                        )
+                    else:
+                        print(
+                            co,
+                            gtfs_route["route"],
+                            "cannot match any in GTFS",
+                            file=sys.stderr,
+                        )
 
     unmatched_co_routes = [
         co_route
