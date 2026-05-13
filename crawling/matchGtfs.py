@@ -327,6 +327,8 @@ def get_route_seq_for_provider_route(
     gtfs_route: dict[str, Any], co_route: Route
 ) -> str:
     """Pick the GTFS sequence that corresponds to an operator route."""
+    if gtfs_route.get("is_circular"):
+        return "1"
     if co_route.get("bound") == "I" and "2" in gtfs_route["stops"]:
         return "2"
     return "1"
