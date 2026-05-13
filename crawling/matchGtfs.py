@@ -4,13 +4,18 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 from haversine import haversine
 from utils import DATA_DIR
 
 INFINITY_DIST = 1000000
 DIST_DIFF = 600
+MatchStopsAlgorithm = Literal["alignment", "legacy"]
+MATCH_STOPS_ALGORITHM: MatchStopsAlgorithm = "alignment"
+SKIP_GTFS_STOP_PENALTY = 120
+SKIP_OPERATOR_STOP_PENALTY = 0
+MAX_SKIPPED_GTFS_STOP_RATIO = 0.2
 logger = logging.getLogger(__name__)
 
 with open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8") as f:
@@ -345,12 +350,124 @@ def isNameMatch(name_a: str, name_b: str) -> bool:
     return tmp_a.find(tmp_b) >= 0 or tmp_b.find(tmp_a) >= 0
 
 
-# ctb routes only give list of stops in topological order
-# the actual servicing routes may skip some stop in the coStops
-# this DP function is trying to map the coStops back to GTFS stops
+def get_stop_match_cost(co_stop: CoStop, gtfs_stop: GtfsStop, co: str) -> float:
+    """Return the distance cost for matching one operator stop to one GTFS stop."""
+    gtfs_stop_name = gtfs_stop["stopName"].get(co)
+    if gtfs_stop_name is not None and co_stop["name_tc"] == gtfs_stop_name["tc"]:
+        return 0
+    return (
+        haversine(
+            (float(co_stop["lat"]), float(co_stop["lng"])),
+            (gtfs_stop["lat"], gtfs_stop["lng"]),
+        )
+        * 1000
+    )
+
+
+def get_max_skipped_gtfs_stops(gtfs_stop_count: int) -> int:
+    """Return how many GTFS-only stops can be skipped before rejecting a match."""
+    return max(1, int(gtfs_stop_count * MAX_SKIPPED_GTFS_STOP_RATIO))
 
 
 def matchStopsByDp(
+    co_stops: list[CoStop],
+    gtfs_stops: list[GtfsStop],
+    co: str,
+    debug: bool = False,
+    algorithm: MatchStopsAlgorithm = MATCH_STOPS_ALGORITHM,
+) -> tuple[list[StopMatch], float]:
+    """Align operator stops to GTFS stops using the configured matching algorithm."""
+    if algorithm == "legacy":
+        return matchStopsByDpLegacy(co_stops, gtfs_stops, co, debug)
+    return matchStopsBySequenceAlignment(co_stops, gtfs_stops, co, debug)
+
+
+def matchStopsBySequenceAlignment(
+    co_stops: list[CoStop],
+    gtfs_stops: list[GtfsStop],
+    co: str,
+    debug: bool = False,
+) -> tuple[list[StopMatch], float]:
+    """Align operator stops to GTFS stops with bidirectional sequence alignment.
+
+    The legacy matcher can skip extra operator stops only. This matcher uses one
+    DP table with three transitions: match both stops, skip an operator stop, or
+    skip a GTFS stop. That allows GTFS to contain inserted intermediate stops
+    without brute-forcing every possible dropped stop.
+    """
+    if co in FERRY_COS:
+        co = "ferry"
+    if not co_stops or not gtfs_stops:
+        return [], INFINITY_DIST
+
+    gtfs_count = len(gtfs_stops)
+    co_count = len(co_stops)
+    dist_sum = [
+        [INFINITY_DIST for _ in range(co_count + 1)] for _ in range(gtfs_count + 1)
+    ]
+    prev_move: list[list[tuple[int, int, str] | None]] = [
+        [None for _ in range(co_count + 1)] for _ in range(gtfs_count + 1)
+    ]
+
+    dist_sum[0][0] = 0
+    for j in range(co_count):
+        dist_sum[0][j + 1] = dist_sum[0][j] + SKIP_OPERATOR_STOP_PENALTY
+        prev_move[0][j + 1] = (0, j, "skip_co")
+    for i in range(gtfs_count):
+        dist_sum[i + 1][0] = dist_sum[i][0] + SKIP_GTFS_STOP_PENALTY
+        prev_move[i + 1][0] = (i, 0, "skip_gtfs")
+
+    for i, gtfs_stop in enumerate(gtfs_stops):
+        for j, co_stop in enumerate(co_stops):
+            candidates = [
+                (
+                    dist_sum[i][j] + get_stop_match_cost(co_stop, gtfs_stop, co),
+                    (i, j, "match"),
+                ),
+                (
+                    dist_sum[i + 1][j] + SKIP_OPERATOR_STOP_PENALTY,
+                    (i + 1, j, "skip_co"),
+                ),
+                (
+                    dist_sum[i][j + 1] + SKIP_GTFS_STOP_PENALTY,
+                    (i, j + 1, "skip_gtfs"),
+                ),
+            ]
+            best_dist, best_move = min(candidates, key=lambda candidate: candidate[0])
+            dist_sum[i + 1][j + 1] = best_dist
+            prev_move[i + 1][j + 1] = best_move
+
+    avg_dist = dist_sum[gtfs_count][co_count] / gtfs_count
+    if not avg_dist < DIST_DIFF:
+        return [], INFINITY_DIST
+
+    i = gtfs_count
+    j = co_count
+    ret: list[StopMatch] = []
+    skipped_gtfs_stops = 0
+    while i > 0 or j > 0:
+        move = prev_move[i][j]
+        if move is None:
+            break
+        prev_i, prev_j, move_type = move
+        if move_type == "match":
+            ret.append((i - 1, j - 1))
+        elif move_type == "skip_gtfs":
+            skipped_gtfs_stops += 1
+        i, j = prev_i, prev_j
+    ret.reverse()
+
+    if not ret or skipped_gtfs_stops > get_max_skipped_gtfs_stops(gtfs_count):
+        return [], INFINITY_DIST
+
+    penalty = sum([abs(a - b) for a, b in ret]) * 0.01
+    return ret, avg_dist + penalty
+
+
+# ctb routes only give list of stops in topological order
+# the actual servicing routes may skip some stop in the coStops
+# this DP function is trying to map the coStops back to GTFS stops
+def matchStopsByDpLegacy(
     co_stops: list[CoStop],
     gtfs_stops: list[GtfsStop],
     co: str,
