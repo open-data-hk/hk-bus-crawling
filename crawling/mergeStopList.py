@@ -43,6 +43,7 @@ type RouteList = dict[str, RouteListEntry]
 type StopList = dict[str, Stop]
 type StopSeqMapping = dict[str, StopSeqEntry]
 type StopListGrid = dict[str, list[str]]
+type StopListGridKey = dict[str, str]
 type StopGroup = list[list[str]]
 type DistanceCache = dict[tuple[str, str], float]
 type BearingRange = tuple[float, float]
@@ -65,6 +66,7 @@ def get_stop_group(
     stop_list: StopList,
     stop_seq_mapping: StopSeqMapping,
     stop_list_grid: StopListGrid,
+    stop_list_grid_key: StopListGridKey,
     distance_cache: DistanceCache,
     stop_id: str,
 ) -> StopGroup:
@@ -107,13 +109,8 @@ def get_stop_group(
     def search_nearby_stops(
         target_stop_id: str, excluded_stop_ids: set[str]
     ) -> list[NearbyStopEntry]:
-        target_stop = stop_list[target_stop_id]
-        # take lat/lng up to 3 decimal places, that's about 100m x 100m square
-        lat = int(target_stop["location"]["lat"] * 1000)
-        lng = int(target_stop["location"]["lng"] * 1000)
-
         nearby_stops = []
-        for stop_id in stop_list_grid.get(f"{lat}_{lng}", []):
+        for stop_id in stop_list_grid.get(stop_list_grid_key[target_stop_id], []):
             if (
                 stop_id not in excluded_stop_ids
                 and get_cached_stop_distance(target_stop_id, stop_id)
@@ -277,10 +274,12 @@ def merge_stop_list() -> None:
     # Preprocess stopList, organise stops into ~100m x ~100m squares to reduce
     # size of nested loop later
     stop_list_grid: StopListGrid = {}
+    stop_list_grid_key: StopListGridKey = {}
     for stop_id, stop in stop_list.items():
         # take lat/lng up to 3 decimal places, that's about 100m x 100m square
         lat = int(stop["location"]["lat"] * 1000)
         lng = int(stop["location"]["lng"] * 1000)
+        stop_list_grid_key[stop_id] = f"{lat}_{lng}"
         # add stop into the 9 grid boxes surrounding this stop
         grid = [
             f"{lat - 1}_{lng - 1}",
@@ -310,7 +309,12 @@ def merge_stop_list() -> None:
         #     logger.info(f"Processed {count} stops ({group_count} groups) at {(time.time() - start_time) * 1000:.2f}ms")
 
         stop_group = get_stop_group(
-            stop_list, stop_seq_mapping, stop_list_grid, distance_cache, stop_id
+            stop_list,
+            stop_seq_mapping,
+            stop_list_grid,
+            stop_list_grid_key,
+            distance_cache,
+            stop_id,
         )
         if len(stop_group) > 0:
             group_count += 1
