@@ -71,28 +71,41 @@ def compress_freq_entries(entries: dict) -> str:
     return "|".join(parts)
 
 
-def orig_dest(
+def has_circular_wording(route_name_part: str) -> bool:
+    return any(
+        circular_wording in route_name_part.lower()
+        for circular_wording in ("循環線", "循环线", "circular")
+    )
+
+
+def store_circular_flag(gtfs_route: dict, is_circular: bool) -> None:
+    gtfs_route["is_circular"] = gtfs_route.get("is_circular", False) or is_circular
+
+
+def orig_dest_circular(
     route_long_name: str, lang: Literal["tc", "sc", "en"]
-) -> tuple[dict, dict]:
+) -> tuple[dict, dict, bool]:
     name_split = route_long_name.split(" - ")
     if len(name_split) > 2:
         logger.warning(
             f"{route_long_name} has more than 1 hyphen, orig & dest may parse wrongly"
         )
     orig = name_split[0]
+    raw_dest = name_split[1]
+    is_circular = has_circular_wording(raw_dest)
 
     # TODO: fix dataset error, e.g. (循環線) in sc version
     # should ask TD to fix it
 
     if lang == "tc":
-        dest = name_split[1].replace("(循環線)", "").rstrip()
-        return {"tc": orig}, {"tc": dest}
+        dest = raw_dest.replace("(循環線)", "").rstrip()
+        return {"tc": orig}, {"tc": dest}, is_circular
     elif lang == "sc":
-        dest = name_split[1].replace("(循环线)", "").rstrip()
-        return {"sc": orig}, {"sc": dest}
+        dest = raw_dest.replace("(循环线)", "").rstrip()
+        return {"sc": orig}, {"sc": dest}, is_circular
     elif lang == "en":
-        dest = name_split[1].replace("(CIRCULAR)", "").rstrip()
-        return {"en": orig}, {"en": dest}
+        dest = raw_dest.replace("(CIRCULAR)", "").rstrip()
+        return {"en": orig}, {"en": dest}, is_circular
 
 
 def route_no(
@@ -146,6 +159,7 @@ async def parseGtfs():
                 "freq": {},
                 "orig": {},
                 "dest": {},
+                "is_circular": False,
                 "jt": routeJourneyTime[route_id],
             }
 
@@ -154,9 +168,12 @@ async def parseGtfs():
         with open(gtfs_dirs[lang] / "routes.txt", "r", encoding="UTF-8") as csvfile:
             for row in csv.DictReader(csvfile):
                 route_id = row["route_id"]
-                orig_l, dest_l = orig_dest(row["route_long_name"], lang)
+                orig_l, dest_l, is_circular = orig_dest_circular(
+                    row["route_long_name"], lang
+                )
                 routeList[route_id]["orig"].update(orig_l)
                 routeList[route_id]["dest"].update(dest_l)
+                store_circular_flag(routeList[route_id], is_circular)
 
     # parse timetable
     with open(primary_dir / "trips.txt", "r", encoding="UTF-8") as f:
