@@ -2,40 +2,93 @@ import json
 import logging
 import math
 import time
+from typing import TypedDict, cast
 
 from haversine import Unit, haversine
 from utils import DATA_DIR
 
 
-def get_stop_group(route_list, stop_list, stop_seq_mapping, stop_list_grid, stop_id):
+class Location(TypedDict):
+    lat: float
+    lng: float
+
+
+class Stop(TypedDict):
+    location: Location
+
+
+class RouteListEntry(TypedDict, total=False):
+    stops: dict[str, list[str]]
+
+
+class RouteStop(TypedDict):
+    routeKey: str
+    co: str
+    seq: int
+    bearing: float
+
+
+class StopSeqEntry(TypedDict):
+    routeStops: list[RouteStop]
+    co: str
+    bearings: list[float]
+
+
+class NearbyStopEntry(TypedDict):
+    id: str
+    co: str
+
+
+type RouteList = dict[str, RouteListEntry]
+type StopList = dict[str, Stop]
+type StopSeqMapping = dict[str, StopSeqEntry]
+type StopListGrid = dict[str, list[str]]
+type StopListGridKey = dict[str, str]
+type StopGroup = list[list[str]]
+type DistanceCache = dict[tuple[str, str], float]
+type BearingRange = tuple[float, float]
+
+
+def get_stops_haversine_distance(stop_a: Stop, stop_b: Stop) -> float:
+    if (
+        stop_a["location"]["lat"] == stop_b["location"]["lat"]
+        and stop_a["location"]["lng"] == stop_b["location"]["lng"]
+    ):
+        return 0
+    return haversine(
+        (stop_a["location"]["lat"], stop_a["location"]["lng"]),
+        (stop_b["location"]["lat"], stop_b["location"]["lng"]),
+        unit=Unit.METERS,  # specify that we want distance in meter, default is km
+    )
+
+
+def get_stop_group(
+    stop_list: StopList,
+    stop_seq_mapping: StopSeqMapping,
+    stop_list_grid: StopListGrid,
+    stop_list_grid_key: StopListGridKey,
+    distance_cache: DistanceCache,
+    stop_id: str,
+) -> StopGroup:
     DISTANCE_THRESHOLD = 50  # in metres
     BEARING_THRESHOLD = 45  # in degrees
     STOP_LIST_LIMIT = 50  # max number of stops in a group
 
-    def get_stops_haversine_distance(stop_a, stop_b):
-        if (
-            stop_a["location"]["lat"] == stop_b["location"]["lat"]
-            and stop_a["location"]["lng"] == stop_b["location"]["lng"]
-        ):
-            return 0
-        return haversine(
-            (stop_a["location"]["lat"], stop_a["location"]["lng"]),
-            (stop_b["location"]["lat"], stop_b["location"]["lng"]),
-            unit=Unit.METERS,  # specify that we want distance in meter, default is km
-        )
-
     bearing_targets = stop_seq_mapping.get(stop_id, {}).get("bearings", [])
+    bearing_ranges: list[BearingRange] = []
+    for target in bearing_targets:
+        bearing_min = target - BEARING_THRESHOLD
+        bearing_max = target + BEARING_THRESHOLD
+        if bearing_min < 0:
+            bearing_min += 360
+        if bearing_max > 360:
+            bearing_max -= 360
+        bearing_ranges.append((bearing_min, bearing_max))
 
-    def is_bearing_in_range(bearing):
-        if BEARING_THRESHOLD >= 180 or not bearing_targets:
+    def is_bearing_in_range(bearing: float) -> bool:
+        if BEARING_THRESHOLD >= 180 or not bearing_ranges:
             return True
-        for target in bearing_targets:
-            bearing_min = target - BEARING_THRESHOLD
-            bearing_max = target + BEARING_THRESHOLD
-            if bearing_min < 0:
-                bearing_min += 360
-            if bearing_max > 360:
-                bearing_max -= 360
+        for bearing_min, bearing_max in bearing_ranges:
             if bearing_min <= bearing <= bearing_max or (
                 bearing_min > bearing_max
                 and (bearing <= bearing_max or bearing >= bearing_min)
@@ -43,31 +96,45 @@ def get_stop_group(route_list, stop_list, stop_seq_mapping, stop_list_grid, stop
                 return True
         return False
 
-    def search_nearby_stops(target_stop_id, excluded_stop_id_list):
-        target_stop = stop_list[target_stop_id]
-        # take lat/lng up to 3 decimal places, that's about 100m x 100m square
-        lat = int(target_stop["location"]["lat"] * 1000)
-        lng = int(target_stop["location"]["lng"] * 1000)
+    def get_cached_stop_distance(stop_id_a: str, stop_id_b: str) -> float:
+        cache_key = (
+            (stop_id_a, stop_id_b) if stop_id_a <= stop_id_b else (stop_id_b, stop_id_a)
+        )
+        if cache_key not in distance_cache:
+            distance_cache[cache_key] = get_stops_haversine_distance(
+                stop_list[stop_id_a], stop_list[stop_id_b]
+            )
+        return distance_cache[cache_key]
 
+    def search_nearby_stops(
+        target_stop_id: str, excluded_stop_ids: set[str]
+    ) -> list[NearbyStopEntry]:
         nearby_stops = []
-        for stop_id in stop_list_grid.get(f"{lat}_{lng}", []):
-            if (
-                stop_id not in excluded_stop_id_list
-                and get_stops_haversine_distance(target_stop, stop_list[stop_id])
-                <= DISTANCE_THRESHOLD
-            ):
-                bearings = stop_seq_mapping.get(stop_id, {}).get("bearings", [])
-                if any(is_bearing_in_range(b) for b in bearings):
-                    nearby_stops.append(
-                        {
-                            "id": stop_id,
-                            "co": stop_seq_mapping.get(stop_id, {}).get("co", ""),
-                        }
-                    )
+        for stop_id in stop_list_grid.get(stop_list_grid_key[target_stop_id], []):
+            if stop_id in excluded_stop_ids:
+                continue
+
+            stop_seq_entry = stop_seq_mapping.get(stop_id, {})
+            bearings = stop_seq_entry.get("bearings", [])
+
+            if not any(is_bearing_in_range(b) for b in bearings):
+                continue
+
+            if get_cached_stop_distance(target_stop_id, stop_id) > DISTANCE_THRESHOLD:
+                continue
+
+            nearby_stops.append(
+                {
+                    "id": stop_id,
+                    "co": stop_seq_entry.get("co", ""),
+                }
+            )
         return nearby_stops
 
-    stop_group = []
-    stop_list_entries = search_nearby_stops(stop_id, [])
+    stop_group: StopGroup = []
+    stop_list_entries = search_nearby_stops(stop_id, {stop_id})
+    discovered_stop_ids = {entry["id"] for entry in stop_list_entries}
+    discovered_stop_ids.add(stop_id)
 
     # recursively search for nearby stops within thresholds (distance and bearing)
     # stop searching when no new stops are found within range, or when stop
@@ -78,17 +145,15 @@ def get_stop_group(route_list, stop_list, stop_seq_mapping, stop_list_grid, stop
         stop_group.append([entry["co"], entry["id"]])
         i += 1
         if len(stop_list_entries) < STOP_LIST_LIMIT:
-            stop_list_entries.extend(
-                search_nearby_stops(entry["id"], [e["id"] for e in stop_list_entries])
-            )
+            new_entries = search_nearby_stops(entry["id"], discovered_stop_ids)
+            discovered_stop_ids.update(entry["id"] for entry in new_entries)
+            stop_list_entries.extend(new_entries)
 
-    # to reduce size of routeFareList.min.json, excl current stop_id from
-    # final output stopMap
-    return [stop for stop in stop_group if stop[1] != stop_id]
+    return stop_group
     # return stop_group
 
 
-def get_bearing(a, b):
+def get_bearing(a: Location, b: Location) -> float:
     φ1 = math.radians(a["lat"])
     φ2 = math.radians(b["lat"])
     λ1 = math.radians(a["lng"])
@@ -101,14 +166,14 @@ def get_bearing(a, b):
     return brng
 
 
-def get_stop_bearings(route_stops):
-    unique_routes = []
-    bearings = []
+def get_stop_bearings(route_stops: list[RouteStop]) -> list[float]:
+    unique_routes: set[str] = set()
+    bearings: list[float] = []
     for route_stop in route_stops:
         if route_stop["bearing"] != -1:
             unique_route = f"{route_stop['co']}_{route_stop['routeKey'].split('+')[0]}_{route_stop['bearing']}"
             if unique_route not in unique_routes:
-                unique_routes.append(unique_route)
+                unique_routes.add(unique_route)
                 bearings.append(route_stop["bearing"])
 
     if not bearings:
@@ -116,11 +181,9 @@ def get_stop_bearings(route_stops):
 
     BEARING_THRESHOLD = 45  # in degrees
     BEARING_EPSILON = 10e-6  # very small number
-    bearing_groups = []
+    bearing_groups: list[list[float]] = []
 
     for bearing in bearings:
-        if bearing == -1:
-            continue
         if not bearing_groups:
             bearing_groups.append([bearing])
             continue
@@ -150,17 +213,17 @@ def get_stop_bearings(route_stops):
 # Main function to process stops
 
 
-def merge_stop_list():
+def merge_stop_list() -> None:
     # Read the result from previous pipeline
     with open(
         DATA_DIR / "routeFareList.mergeRoutes.min.json", "r", encoding="UTF-8"
     ) as f:
         db = json.load(f)
 
-    route_list = db["routeList"]
-    stop_list = db["stopList"]
+    route_list = cast(RouteList, db["routeList"])
+    stop_list = cast(StopList, db["stopList"])
     start_time = time.time()
-    stop_seq_mapping = {}
+    stop_seq_mapping: StopSeqMapping = {}
 
     # Preprocess the list of bearings for each stop
     for route_key, route_list_entry in route_list.items():
@@ -212,11 +275,13 @@ def merge_stop_list():
 
     # Preprocess stopList, organise stops into ~100m x ~100m squares to reduce
     # size of nested loop later
-    stop_list_grid = {}
+    stop_list_grid: StopListGrid = {}
+    stop_list_grid_key: StopListGridKey = {}
     for stop_id, stop in stop_list.items():
         # take lat/lng up to 3 decimal places, that's about 100m x 100m square
         lat = int(stop["location"]["lat"] * 1000)
         lng = int(stop["location"]["lng"] * 1000)
+        stop_list_grid_key[stop_id] = f"{lat}_{lng}"
         # add stop into the 9 grid boxes surrounding this stop
         grid = [
             f"{lat - 1}_{lng - 1}",
@@ -235,7 +300,8 @@ def merge_stop_list():
             stop_list_grid[grid_id].append(stop_id)
 
     target_stop_list = list(stop_list.items())
-    stop_map = {}
+    stop_map: dict[str, StopGroup] = {}
+    distance_cache: DistanceCache = {}
     count = 0
     group_count = 0
 
@@ -245,7 +311,12 @@ def merge_stop_list():
         #     logger.info(f"Processed {count} stops ({group_count} groups) at {(time.time() - start_time) * 1000:.2f}ms")
 
         stop_group = get_stop_group(
-            route_list, stop_list, stop_seq_mapping, stop_list_grid, stop_id
+            stop_list,
+            stop_seq_mapping,
+            stop_list_grid,
+            stop_list_grid_key,
+            distance_cache,
+            stop_id,
         )
         if len(stop_group) > 0:
             group_count += 1
