@@ -114,19 +114,21 @@ def get_stop_group(
             if stop_id in excluded_stop_ids:
                 continue
 
-            if get_cached_stop_distance(target_stop_id, stop_id) > DISTANCE_THRESHOLD:
-                continue
-
             stop_seq_entry = stop_seq_mapping.get(stop_id, {})
             bearings = stop_seq_entry.get("bearings", [])
 
-            if any(is_bearing_in_range(b) for b in bearings):
-                nearby_stops.append(
-                    {
-                        "id": stop_id,
-                        "co": stop_seq_entry.get("co", ""),
-                    }
-                )
+            if not any(is_bearing_in_range(b) for b in bearings):
+                continue
+
+            if get_cached_stop_distance(target_stop_id, stop_id) > DISTANCE_THRESHOLD:
+                continue
+
+            nearby_stops.append(
+                {
+                    "id": stop_id,
+                    "co": stop_seq_entry.get("co", ""),
+                }
+            )
         return nearby_stops
 
     stop_group: StopGroup = []
