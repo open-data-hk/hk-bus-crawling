@@ -167,13 +167,13 @@ def get_bearing(a: Location, b: Location) -> float:
 
 
 def get_stop_bearings(route_stops: list[RouteStop]) -> list[float]:
-    unique_routes: list[str] = []
+    unique_routes: set[str] = set()
     bearings: list[float] = []
     for route_stop in route_stops:
         if route_stop["bearing"] != -1:
             unique_route = f"{route_stop['co']}_{route_stop['routeKey'].split('+')[0]}_{route_stop['bearing']}"
             if unique_route not in unique_routes:
-                unique_routes.append(unique_route)
+                unique_routes.add(unique_route)
                 bearings.append(route_stop["bearing"])
 
     if not bearings:
