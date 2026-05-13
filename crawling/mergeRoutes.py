@@ -117,8 +117,7 @@ def getStopObj(co_stop):
         "name": {
             "en": co_stop["name_en"],
             "tc": co_stop["name_tc"],
-            # TODO: implement sc
-            # "sc": co_stop["name_sc"],
+            "sc": co_stop["name_sc"],
         },
         "location": {
             "lat": float(co_stop["lat"]),
@@ -131,8 +130,7 @@ def getRouteNameObj(co_route, prefix):
     return {
         "en": co_route[f"{prefix}_en"].replace("/", "／"),
         "tc": co_route[f"{prefix}_tc"].replace("/", "／"),
-        # TODO: implement sc
-        # "sc": co_route[f"{prefix}_sc"].replace("/", "／"),
+        "sc": co_route[f"{prefix}_sc"].replace("/", "／"),
     }
 
 

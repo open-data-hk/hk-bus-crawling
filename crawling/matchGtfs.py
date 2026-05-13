@@ -21,6 +21,7 @@ class CoStop(TypedDict):
     """A bus/ferry stop as returned by an operator's API."""
 
     name_tc: str
+    name_sc: str
     name_en: str
     lat: str
     lng: str
@@ -28,6 +29,7 @@ class CoStop(TypedDict):
 
 class GtfsStopName(TypedDict):
     tc: str
+    sc: str
     en: str
 
 
@@ -47,8 +49,10 @@ class Route(TypedDict, total=False):
     bound: str
     orig_en: str
     orig_tc: str
+    orig_sc: str
     dest_en: str
     dest_tc: str
+    dest_sc: str
     service_type: str
     stops: list[str]
     gtfs_id: str
@@ -273,8 +277,10 @@ def mergeRouteAsCircularRoute(routeA: Route, routeB: Route) -> Route:
         "bound": routeA["bound"] + routeB["bound"],
         "orig_en": routeA["orig_en"],
         "orig_tc": routeA["orig_tc"],
+        "orig_sc": routeA["orig_sc"],
         "dest_en": routeB["dest_en"],
         "dest_tc": routeB["dest_tc"],
+        "dest_sc": routeB["dest_sc"],
         "service_type": routeA["service_type"],
         "stops": routeA["stops"] + routeB["stops"],
         "virtual": True,
@@ -559,12 +565,18 @@ def match_co_routes_with_gtfs(co: str) -> None:
                         route_candidate["orig_tc"] = co_stops[
                             route_candidate["stops"][0]
                         ]["name_tc"]
+                        route_candidate["orig_sc"] = co_stops[
+                            route_candidate["stops"][0]
+                        ]["name_sc"]
                         route_candidate["orig_en"] = co_stops[
                             route_candidate["stops"][0]
                         ]["name_en"]
                         route_candidate["dest_tc"] = co_stops[
                             route_candidate["stops"][-1]
                         ]["name_tc"]
+                        route_candidate["dest_sc"] = co_stops[
+                            route_candidate["stops"][-1]
+                        ]["name_sc"]
                         route_candidate["dest_en"] = co_stops[
                             route_candidate["stops"][-1]
                         ]["name_en"]
