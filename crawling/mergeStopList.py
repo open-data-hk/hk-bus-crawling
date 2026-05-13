@@ -264,11 +264,6 @@ def merge_stop_list() -> None:
             stop_seq_mapping[stop_id]["routeStops"]
         )
 
-    # Just dump the json in case of a need for trouble-shooting, but otherwise
-    # we do not need this file
-    with open(DATA_DIR / "stopMap.routeStopsSequence.json", "w", encoding="UTF-8") as f:
-        json.dump(stop_seq_mapping, f, ensure_ascii=False)
-
     logger.info(
         f"Processed routeStopsSequence in {(time.time() - start_time) * 1000:.2f}ms"
     )
@@ -326,9 +321,6 @@ def merge_stop_list() -> None:
         f"Processed {count} stops ({group_count} groups) at {(time.time() - start_time) * 1000:.2f}ms"
     )
 
-    with open(DATA_DIR / "stopMap.json", "w", encoding="UTF-8") as f:
-        json.dump(stop_map, f, ensure_ascii=False)
-
     db["stopMap"] = stop_map
 
     with open(DATA_DIR / "routeFareList.json", "w", encoding="UTF-8") as f:
@@ -351,13 +343,7 @@ def merge_stop_list() -> None:
         f"Reduced location lat/lng to 5 d.p. at {(time.time() - start_time) * 1000:.2f}ms"
     )
 
-    with open(DATA_DIR / "routeFareList.alpha.json", "w", encoding="UTF-8") as f:
-        json.dump(db, f, ensure_ascii=False)
-
     with open(DATA_DIR / "routeFareList.min.json", "w", encoding="UTF-8") as f:
-        json.dump(db, f, ensure_ascii=False)
-
-    with open(DATA_DIR / "routeFareList.alpha.min.json", "w", encoding="UTF-8") as f:
         json.dump(db, f, ensure_ascii=False)
 
 
