@@ -54,6 +54,7 @@ class StopAlignmentEntry(TypedDict):
     status: str
     gtfs_stop: str | None
     co_stop: str | None
+    distance: float | None
 
 
 class Route(TypedDict, total=False):
@@ -754,11 +755,15 @@ def printStopMatches(
 
 def build_stop_alignment(
     co_stop_ids: list[str],
+    co_stops: dict[str, CoStop],
     gtfs_stop_ids: list[str],
+    gtfs_stops: dict[str, GtfsStop],
     stop_matches: list[StopMatch],
+    co: str,
 ) -> list[StopAlignmentEntry]:
     """Build an ordered export of matched, GTFS-only, and operator-only stops."""
     alignment: list[StopAlignmentEntry] = []
+    stop_name_co = "ferry" if co in FERRY_COS else co
     gtfs_idx = 0
     co_idx = 0
 
@@ -769,6 +774,7 @@ def build_stop_alignment(
                     "status": "extra_gtfs",
                     "gtfs_stop": gtfs_stop_ids[gtfs_idx],
                     "co_stop": None,
+                    "distance": None,
                 }
             )
             gtfs_idx += 1
@@ -778,15 +784,21 @@ def build_stop_alignment(
                     "status": "extra_operator",
                     "gtfs_stop": None,
                     "co_stop": co_stop_ids[co_idx],
+                    "distance": None,
                 }
             )
             co_idx += 1
 
+        gtfs_stop_id = gtfs_stop_ids[matched_gtfs_idx]
+        co_stop_id = co_stop_ids[matched_co_idx]
         alignment.append(
             {
                 "status": "matched",
-                "gtfs_stop": gtfs_stop_ids[matched_gtfs_idx],
-                "co_stop": co_stop_ids[matched_co_idx],
+                "gtfs_stop": gtfs_stop_id,
+                "co_stop": co_stop_id,
+                "distance": get_stop_match_cost(
+                    co_stops[co_stop_id], gtfs_stops[gtfs_stop_id], stop_name_co
+                ),
             }
         )
         gtfs_idx = matched_gtfs_idx + 1
@@ -798,6 +810,7 @@ def build_stop_alignment(
                 "status": "extra_gtfs",
                 "gtfs_stop": gtfs_stop_ids[gtfs_idx],
                 "co_stop": None,
+                "distance": None,
             }
         )
         gtfs_idx += 1
@@ -807,6 +820,7 @@ def build_stop_alignment(
                 "status": "extra_operator",
                 "gtfs_stop": None,
                 "co_stop": co_stop_ids[co_idx],
+                "distance": None,
             }
         )
         co_idx += 1
@@ -817,13 +831,16 @@ def build_stop_alignment(
 def add_gtfs_stop_alignment(
     route: Route,
     co_stop_ids: list[str],
+    co_stops: dict[str, CoStop],
     gtfs_stop_ids: list[str],
+    gtfs_stops: dict[str, GtfsStop],
     stop_matches: list[StopMatch],
+    co: str,
 ) -> None:
     """Attach full GTFS stops and alignment metadata to an exported route."""
     route["gtfs_stops"] = gtfs_stop_ids
     route["stop_alignment"] = build_stop_alignment(
-        co_stop_ids, gtfs_stop_ids, stop_matches
+        co_stop_ids, co_stops, gtfs_stop_ids, gtfs_stops, stop_matches, co
     )
 
 
@@ -982,8 +999,11 @@ def match_co_routes_with_gtfs(co: str) -> None:
                         add_gtfs_stop_alignment(
                             route_candidate,
                             co_route["stops"],
+                            co_stops,
                             gtfs_route_seq_stops,
+                            gtfs_stops,
                             ret,
+                            stop_name_co,
                         )
                         co_route["found"] = True
                         matched_co_route_ids.add(id(co_route))
@@ -1021,8 +1041,11 @@ def match_co_routes_with_gtfs(co: str) -> None:
                         add_gtfs_stop_alignment(
                             route_candidate,
                             co_route["stops"],
+                            co_stops,
                             gtfs_route_seq_stops,
+                            gtfs_stops,
                             ret,
+                            stop_name_co,
                         )
                         # mark the route has mapped to GTFS, mainly for ctb routes
                         co_route["found"] = True
