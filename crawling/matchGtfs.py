@@ -935,6 +935,11 @@ def match_co_routes_with_gtfs(co: str) -> None:
                             co_routes, route_no
                         )
                     ]
+                    if not virtual_routes:
+                        logger.info(
+                            "Circular GTFS route has no virtual operator candidates: %s",
+                            format_gtfs_route_for_log(gtfs_id, gtfs_route, [route_seq]),
+                        )
                 for co_route in co_routes + virtual_routes:
                     matching_gtfs_co = get_matching_gtfs_co(co, co_route, gtfs_route)
                     if matching_gtfs_co is not None or (
@@ -980,6 +985,11 @@ def match_co_routes_with_gtfs(co: str) -> None:
                 best_match_avgDist = best_match[1]
                 if best_match_avgDist < DIST_DIFF:
                     _, _, ret, route_seq, gtfs_route_seq_stops, co_route = best_match
+                    if co_route.get("virtual"):
+                        logger.info(
+                            "Matched circular GTFS route with virtual operator route: %s",
+                            format_gtfs_route_for_log(gtfs_id, gtfs_route, [route_seq]),
+                        )
 
                     route_candidate = co_route.copy()
                     if (
