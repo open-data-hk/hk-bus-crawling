@@ -74,6 +74,7 @@ poetry run python ./crawling/parseGtfs.py
 poetry run python ./crawling/sunferry.py
 poetry run python ./crawling/fortuneferry.py
 poetry run python ./crawling/hkkf.py
+poetry run python ./crawling/gmb_crawl.py
 poetry run python ./crawling/gmb.py
 poetry run python ./crawling/matchGtfs.py
 poetry run python ./crawling/cleansing.py
