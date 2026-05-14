@@ -31,6 +31,14 @@ jobs:
       - name: Install dependencies
         run: poetry install
 
+      - name: Download GMB raw data from S3
+        continue-on-error: true
+        run: |
+          aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeNoList.json data/ || true
+          aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeList.json data/ || true
+          aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeStopList.json data/ || true
+          aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.stopList.json data/ || true
+
       - name: Crawl GMB raw data
         env:
           REQUEST_LIMIT: "6"
