@@ -11,7 +11,6 @@ try:
         RAW_STOP_LIST,
     )
     from .schemas import ProviderRoute, ProviderStop
-    from .utils import DATA_DIR
 except ImportError:
     from crawl_utils import dump_provider_data
     from ctb_crawl import (
@@ -20,13 +19,8 @@ except ImportError:
         RAW_STOP_LIST,
     )
     from schemas import ProviderRoute, ProviderStop
-    from utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
-
-# define output name
-ROUTE_LIST = DATA_DIR / "routeList.ctb.json"
-STOP_LIST = DATA_DIR / "stopList.ctb.json"
 
 
 def load_raw_json(path: Path):
@@ -69,10 +63,6 @@ def build_route_stop_ids(
 
 async def prepare_data():
     ensure_raw_files_exist()
-
-    if ROUTE_LIST.exists():
-        logger.info(f"{ROUTE_LIST} already exist, skipping...")
-        return
 
     route_list = load_raw_json(RAW_ROUTE_LIST)
     route_stop_list = load_raw_json(RAW_ROUTE_STOP_LIST)
