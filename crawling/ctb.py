@@ -21,63 +21,6 @@ STOP_LIST = DATA_DIR / "stopList.ctb.json"
 
 
 async def prepare_data():
-    a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
-
-    # load route list and stop list if exist
-    route_list: list[dict] = []
-    # TODO: check why return if route_list exists
-    if ROUTE_LIST.exists():
-        logger.info(f"{ROUTE_LIST} already exist, skipping...")
-        return
-    else:
-        # load routes
-        raw_route_list_path = Path(RAW_ROUTE_LIST)
-        if raw_route_list_path.exists():
-            route_list = json.loads(raw_route_list_path.read_text("utf-8"))
-        else:
-            route_list = await get_route_list(a_client)
-            raw_route_list_path.write_text(
-                json.dumps(route_list, ensure_ascii=False), encoding="UTF-8"
-            )
-
-    _stop_ids = []
-    stop_list: dict[str, ProviderStop] = {}
-    if STOP_LIST.exists():
-        with open(STOP_LIST, "r", encoding="UTF-8") as f:
-            stop_list = json.load(f)
-
-    raw_route_stop_list_path = Path(RAW_ROUTE_STOP_LIST)
-    if raw_route_stop_list_path.exists():
-        route_stop_list = json.loads(raw_route_stop_list_path.read_text("utf-8"))
-    else:
-        route_stop_list = await get_route_stop_list(route_list, a_client)
-        raw_route_stop_list_path.write_text(
-            json.dumps(route_stop_list, ensure_ascii=False), encoding="UTF-8"
-        )
-
-    logger.info("Preparing data of ctb")
-
-    for route in route_list:
-
-        route["stops"] = {}
-        for direction in ["inbound", "outbound"]:
-            route_code = f"{route['route']}-{direction}"
-            route_stop = route_stop_list[route_code]
-            route["stops"][direction] = [stop["stop"] for stop in route_stop]
-
-            _stop_ids.extend(route["stops"][direction])
-
-    # load stops for this route aync
-    _stop_ids = sorted(set(_stop_ids))
-
-    raw_stop_list_path = Path(RAW_STOP_LIST)
-    if raw_stop_list_path.exists():
-        stop_list_raw = json.loads(raw_stop_list_path.read_text("utf-8"))
-    else:
-        stop_list_raw = await get_stop_list(_stop_ids, a_client)
-        raw_stop_list_path.write_text(
-            json.dumps(stop_list_raw, ensure_ascii=False), encoding="UTF-8"
-        )
 
     stopInfos = list(zip(_stop_ids, stop_list_raw))
     for stopId, stopInfo in stopInfos:
