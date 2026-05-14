@@ -2,6 +2,7 @@
 set -e
 
 python ./crawling/parseHoliday.py
+python ./crawling/ctb_crawl.py
 python ./crawling/ctb.py
 python ./crawling/kmb.py
 python ./crawling/nlb.py

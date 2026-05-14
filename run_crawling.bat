@@ -1,6 +1,7 @@
 @echo off
 
 python ./crawling/parseHoliday.py pause
+python ./crawling/ctb_crawl.py pause
 python ./crawling/ctb.py pause
 python ./crawling/kmb.py pause
 python ./crawling/nlb.py pause
