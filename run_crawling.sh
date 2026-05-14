@@ -14,6 +14,7 @@ python ./crawling/parseGtfs.py
 python ./crawling/sunferry.py
 python ./crawling/fortuneferry.py
 python ./crawling/hkkf.py
+python ./crawling/gmb_crawl.py
 python ./crawling/gmb.py
 python ./crawling/matchGtfs.py
 python ./crawling/cleansing.py

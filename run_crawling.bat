@@ -13,8 +13,8 @@ python ./crawling/parseGtfs.py pause
 python ./crawling/sunferry.py pause
 python ./crawling/fortuneferry.py pause
 python ./crawling/hkkf.py pause
+python ./crawling/gmb_crawl.py pause
 python ./crawling/gmb.py pause
 python ./crawling/matchGtfs.py pause
 python ./crawling/cleansing.py pause
 python ./crawling/mergeRoutes.py pause
-

@@ -1,0 +1,56 @@
+name: Crawl GMB Data
+on:
+  schedule:
+    - cron: "21 20 * * *" # 04:21 (HKT) daily (GMB individual records updated randomly anytime, 4am seems make sense)
+  workflow_dispatch:
+
+jobs:
+  Crawl-GMB-Data:
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ENDPOINT_URL: ${{ secrets.AWS_ENDPOINT_URL }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v6
+
+      - name: Install poetry
+        run: pipx install poetry
+
+      - name: Setup Python environment
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+          architecture: 'x64'
+          cache: 'poetry'
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Crawl GMB raw data
+        env:
+          REQUEST_LIMIT: "6"
+        run: poetry run python ./crawling/gmb_crawl.py
+
+      - name: Upload GMB raw data to S3
+        run: |
+          aws s3 cp data/gmb.raw.routeNoList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeNoList.json
+          aws s3 cp data/gmb.raw.routeList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeList.json
+          aws s3 cp data/gmb.raw.routeStopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeStopList.json
+          aws s3 cp data/gmb.raw.stopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.stopList.json
+
+      - name: Archive GMB raw data
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: GMB Raw Files
+          retention-days: 14
+          path: |
+            data/gmb.raw.routeNoList.json
+            data/gmb.raw.routeList.json
+            data/gmb.raw.routeStopList.json
+            data/gmb.raw.stopList.json
