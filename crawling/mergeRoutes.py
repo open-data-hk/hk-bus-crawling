@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 from sys import stderr
 
@@ -47,7 +49,7 @@ def getRouteObj(
     nlbId,
     gtfsRouteId,
     gtfsRouteSeq,
-    stopAlignment=None,
+    stops_and_alignment=None,
     serviceType=1,
 ):
     route_obj = {
@@ -67,14 +69,14 @@ def getRouteObj(
         "gtfsRouteSeq": gtfsRouteSeq,
         "seq": seq,
     }
-    if stopAlignment:
-        route_obj["stopAlignment"] = stopAlignment
+    if stops_and_alignment:
+        route_obj["stops_and_alignment"] = stops_and_alignment
     return route_obj
 
 
 def addStopAlignmentToRoute(route, co, co_route):
     if "stop_alignment" in co_route:
-        route.setdefault("stopAlignment", {})[co] = co_route["stop_alignment"]
+        route.setdefault("stops_and_alignment", {})[co] = co_route["stop_alignment"]
 
 
 def addCircularMetadataToRoute(route, co, co_route):
@@ -207,7 +209,7 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
                     "gtfs_route_id", co_route.get("gtfs", [None])[0]
                 ),
                 gtfsRouteSeq=co_route.get("gtfs_route_seq"),
-                stopAlignment=(
+                stops_and_alignment=(
                     {co: co_route["stop_alignment"]}
                     if "stop_alignment" in co_route
                     else None
@@ -263,9 +265,9 @@ def smartUnique(route_list):
         for found in founds:
             route_i["co"].extend(route_list[found]["co"])
             route_i["stops"].extend(route_list[found]["stops"])
-            if "stopAlignment" in route_list[found]:
-                route_i.setdefault("stopAlignment", {}).update(
-                    route_list[found]["stopAlignment"]
+            if "stops_and_alignment" in route_list[found]:
+                route_i.setdefault("stops_and_alignment", {}).update(
+                    route_list[found]["stops_and_alignment"]
                 )
             if "circular_return_point" in route_list[found]:
                 route_i.setdefault("circular_return_point", {}).update(
@@ -281,6 +283,72 @@ def smartUnique(route_list):
         _routeList.append(route_i)
 
     return _routeList
+
+
+def get_stop_alignment_csv_value(value):
+    if value is None:
+        return "/"
+    if isinstance(value, (int, float)):
+        if value == 0:
+            return "0"
+        return f"{value:.1f}"
+    return value
+
+
+def get_stop_alignment_csv_row(cos, gtfs_stop=None):
+    row = {"gtfs": get_stop_alignment_csv_value(gtfs_stop)}
+    for co in cos:
+        row[co] = "/"
+        row[f"{co}_d"] = "/"
+    return row
+
+
+def compressStopAlignment(stop_alignment, cos):
+    fieldnames = ["gtfs"]
+    for co in cos:
+        if co in stop_alignment:
+            fieldnames.extend([co, f"{co}_d"])
+
+    rows = []
+    rows_by_gtfs = {}
+    for co in cos:
+        if co not in stop_alignment:
+            continue
+        gtfs_occurrences = {}
+        for alignment in stop_alignment[co]:
+            gtfs_stop = alignment["gtfs_stop"]
+            if gtfs_stop is None:
+                row = get_stop_alignment_csv_row(cos)
+                rows.append(row)
+            else:
+                occurrence = gtfs_occurrences.get(gtfs_stop, 0)
+                gtfs_occurrences[gtfs_stop] = occurrence + 1
+                gtfs_rows = rows_by_gtfs.setdefault(gtfs_stop, [])
+                if occurrence < len(gtfs_rows):
+                    row = gtfs_rows[occurrence]
+                else:
+                    row = get_stop_alignment_csv_row(cos, gtfs_stop)
+                    rows.append(row)
+                    gtfs_rows.append(row)
+
+            row[co] = get_stop_alignment_csv_value(alignment["co_stop"])
+            row[f"{co}_d"] = get_stop_alignment_csv_value(alignment["distance"])
+
+    csv_file = io.StringIO()
+    writer = csv.DictWriter(
+        csv_file, fieldnames=fieldnames, extrasaction="ignore", lineterminator="\n"
+    )
+    writer.writeheader()
+    writer.writerows(rows)
+    return csv_file.getvalue()
+
+
+def compressRouteStopAlignments(route_list):
+    for route in route_list:
+        if "stops_and_alignment" in route:
+            route["stops_and_alignment"] = compressStopAlignment(
+                route["stops_and_alignment"], route["co"]
+            )
 
 
 def standardizeDict(d):
@@ -299,6 +367,10 @@ def main():
     routeList = smartUnique(routeList)
     for route in routeList:
         route["stops"] = {co: stops for co, stops in route["stops"]}
+    # TODO: low priority, align sequence of all operators and GTFS together, currently they are aligned separately
+    # extra stop from one operator will append row individually
+    # if 3 operators have the same extra stop, their will be 3 rows appended
+    compressRouteStopAlignments(routeList)
 
     holidays = loadJson(DATA_DIR / "holiday.json")
     serviceDayMap = loadJson(DATA_DIR / "gtfs.json")["serviceDayMap"]
