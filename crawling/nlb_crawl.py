@@ -18,8 +18,11 @@ logger = logging.getLogger(__name__)
 # Raw list files
 RAW_ROUTE_LIST = DATA_DIR / "nlb.raw.routeList.json"
 RAW_ROUTE_STOP_LIST = DATA_DIR / "nlb.raw.routeStopList.json"
+RAW_STOP_LIST = DATA_DIR / "nlb.raw.stopList.json"
 
 BASE_URL = "https://rt.data.gov.hk/v2/transport/nlb"
+
+ROUTE_STOP_ONLY_FIELDS = {"fare", "fareHoliday", "someDepartureObserveOnly"}
 
 
 def routes_url():
@@ -56,6 +59,26 @@ async def get_route_stop_list(route_list: list[dict], a_client) -> dict[str, lis
     }
 
 
+def get_stop_from_route_stop(route_stop: dict) -> dict:
+    return {
+        key: value
+        for key, value in route_stop.items()
+        if key not in ROUTE_STOP_ONLY_FIELDS
+    }
+
+
+def get_stop_list(route_stop_list: dict[str, list]) -> dict[str, dict]:
+    stop_list = {}
+    for route_stops in route_stop_list.values():
+        for route_stop in route_stops:
+            stop_id = str(route_stop["stopId"])
+            stop = get_stop_from_route_stop(route_stop)
+            if stop_id in stop_list and stop_list[stop_id] != stop:
+                logger.warning(f"NLB stop {stop_id} has inconsistent stop data")
+            stop_list[stop_id] = stop
+    return stop_list
+
+
 async def prepare_raw_data(force: bool = False):
     async with httpx.AsyncClient() as a_client:
         raw_route_list_path = Path(RAW_ROUTE_LIST)
@@ -70,12 +93,22 @@ async def prepare_raw_data(force: bool = False):
 
         raw_route_stop_list_path = Path(RAW_ROUTE_STOP_LIST)
         if raw_route_stop_list_path.exists() and not force:
-            logger.info(f"{RAW_ROUTE_STOP_LIST} already exists, skipping...")
+            logger.info(f"{RAW_ROUTE_STOP_LIST} already exists, loading...")
+            route_stop_list = json.loads(raw_route_stop_list_path.read_text("utf-8"))
+        else:
+            route_stop_list = await get_route_stop_list(route_list, a_client)
+            raw_route_stop_list_path.write_text(
+                json.dumps(route_stop_list, ensure_ascii=False), encoding="UTF-8"
+            )
+
+        raw_stop_list_path = Path(RAW_STOP_LIST)
+        if raw_stop_list_path.exists() and not force:
+            logger.info(f"{RAW_STOP_LIST} already exists, skipping...")
             return
 
-        route_stop_list = await get_route_stop_list(route_list, a_client)
-        raw_route_stop_list_path.write_text(
-            json.dumps(route_stop_list, ensure_ascii=False), encoding="UTF-8"
+        stop_list = get_stop_list(route_stop_list)
+        raw_stop_list_path.write_text(
+            json.dumps(stop_list, ensure_ascii=False), encoding="UTF-8"
         )
 
 
