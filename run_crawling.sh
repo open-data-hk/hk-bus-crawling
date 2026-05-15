@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+python ./crawling/parseJourneyTime.py
+python ./crawling/parseGtfs.py
 python ./crawling/parseHoliday.py
 python ./crawling/ctb_crawl.py
 python ./crawling/ctb.py
@@ -11,8 +13,6 @@ python ./crawling/nlb.py
 python ./crawling/lrtfeeder.py
 python ./crawling/lightRail.py
 python ./crawling/mtr.py
-python ./crawling/parseJourneyTime.py
-python ./crawling/parseGtfs.py
 python ./crawling/sunferry.py
 python ./crawling/fortuneferry.py
 python ./crawling/hkkf.py
