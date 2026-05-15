@@ -81,6 +81,13 @@ jobs:
           aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.routeStopList.json data/ || true
           aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.stopList.json data/ || true
 
+      - name: Download NLB raw data from S3
+        continue-on-error: true
+        run: |
+          aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/transport/nlb/nlb.raw.routeList.json data/ || true
+          aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/transport/nlb/nlb.raw.routeStopList.json data/ || true
+          aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/transport/nlb/nlb.raw.stopList.json data/ || true
+
       - name: Crawling resources
         shell: bash
         env:
@@ -91,6 +98,7 @@ jobs:
           poetry run python ./crawling/ctb_crawl.py
           poetry run python ./crawling/ctb.py
           poetry run python ./crawling/kmb.py
+          poetry run python ./crawling/nlb_crawl.py
           poetry run python ./crawling/nlb.py
           poetry run python ./crawling/lrtfeeder.py
           poetry run python ./crawling/lightRail.py
@@ -126,6 +134,12 @@ jobs:
           aws s3 cp data/ctb.raw.routeList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.routeList.json
           aws s3 cp data/ctb.raw.routeStopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.routeStopList.json
           aws s3 cp data/ctb.raw.stopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.stopList.json
+
+      - name: Upload NLB raw data to S3
+        run: |
+          aws s3 cp data/nlb.raw.routeList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/nlb/nlb.raw.routeList.json
+          aws s3 cp data/nlb.raw.routeStopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/nlb/nlb.raw.routeStopList.json
+          aws s3 cp data/nlb.raw.stopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/nlb/nlb.raw.stopList.json
 
       - name: Archive crawling outputs
         uses: actions/upload-artifact@v7

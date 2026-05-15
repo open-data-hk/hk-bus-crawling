@@ -65,6 +65,7 @@ poetry run python ./crawling/parseHoliday.py
 poetry run python ./crawling/ctb_crawl.py
 poetry run python ./crawling/ctb.py
 poetry run python ./crawling/kmb.py
+poetry run python ./crawling/nlb_crawl.py
 poetry run python ./crawling/nlb.py
 poetry run python ./crawling/lrtfeeder.py
 poetry run python ./crawling/lightRail.py
