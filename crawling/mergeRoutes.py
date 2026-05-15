@@ -60,18 +60,30 @@ def getRouteObj(
         "bound": bound,
         "orig": orig,
         "dest": dest,
-        "fares": fares,
         "faresHoliday": faresHoliday,
-        "freq": freq,
-        "jt": jt,
         "nlbId": nlbId,
-        "gtfsRouteId": gtfsRouteId,
-        "gtfsRouteSeq": gtfsRouteSeq,
         "seq": seq,
     }
+    if fares is not None:
+        route_obj["fares"] = fares
+    if freq is not None:
+        route_obj["freq"] = freq
+    if jt is not None:
+        route_obj["jt"] = jt
+    if gtfsRouteId is not None:
+        route_obj["gtfs_route_id"] = gtfsRouteId
+    if gtfsRouteSeq is not None:
+        route_obj["gtfs_route_seq"] = gtfsRouteSeq
     if stops_and_alignment:
         route_obj["stops_and_alignment"] = stops_and_alignment
     return route_obj
+
+
+def getCoRouteGtfsRouteId(co_route):
+    gtfs_route_ids = co_route.get("gtfs")
+    if gtfs_route_ids:
+        return gtfs_route_ids[0]
+    return co_route.get("gtfs_route_id")
 
 
 def addStopAlignmentToRoute(route, co, co_route):
@@ -88,13 +100,14 @@ def addCircularMetadataToRoute(route, co, co_route):
         route.setdefault("circular_sections", {})[co] = co_route["circular_sections"]
 
 
-def isGtfsMatch(knownRoute, newRoute):
-    if knownRoute["gtfsRouteId"] is None:
+def isGtfsMatch(whole_route, co_route):
+    if whole_route.get("gtfs_route_id") is None:
         return True
-    if "gtfs" not in newRoute:
+    new_gtfs_route_ids = co_route.get("gtfs")
+    if not new_gtfs_route_ids:
         return True
 
-    return knownRoute["gtfsRouteId"] in newRoute["gtfs"]
+    return whole_route["gtfs_route_id"] in new_gtfs_route_ids
 
 
 def isSameStopSequence(co_stop_ids, w_stop_ids, whole_stop_list):
@@ -205,9 +218,7 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
                 freq=co_route.get("freq", None),
                 jt=co_route.get("jt", None),
                 nlbId=co_route.get("id", None),
-                gtfsRouteId=co_route.get(
-                    "gtfs_route_id", co_route.get("gtfs", [None])[0]
-                ),
+                gtfsRouteId=getCoRouteGtfsRouteId(co_route),
                 gtfsRouteSeq=co_route.get("gtfs_route_seq"),
                 stops_and_alignment=(
                     {co: co_route["stop_alignment"]}
