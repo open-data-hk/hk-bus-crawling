@@ -10,7 +10,8 @@ def is_name_match(name_a: str, name_b: str) -> bool:
     return lower_a in lower_b or lower_b in lower_a
 
 
-def _time_to_min(t):
+def _time_to_min(t: str) -> int:
+    """e.g. 0730xxxxx = 07 x 60 + 30 = 450"""
     return int(t[:2]) * 60 + int(t[2:4])
 
 
