@@ -14,6 +14,7 @@ class Location(TypedDict):
 
 
 class Stop(TypedDict):
+    co: str
     location: Location
 
 
@@ -45,6 +46,7 @@ type StopSeqMapping = dict[str, StopSeqEntry]
 type StopListGrid = dict[str, list[str]]
 type StopListGridKey = dict[str, str]
 type StopGroup = list[list[str]]
+type StopGroupStr = str
 type DistanceCache = dict[tuple[str, str], float]
 type BearingRange = tuple[float, float]
 
@@ -210,6 +212,20 @@ def get_stop_bearings(route_stops: list[RouteStop]) -> list[float]:
     ]
 
 
+def get_stop_group_str(
+    stop_id: str,
+    stop_group: StopGroup,
+    stop_seq_mapping: StopSeqMapping,
+    stop_list: StopList,
+) -> StopGroupStr:
+    co = stop_seq_mapping.get(stop_id, {}).get("co") or stop_list[stop_id]["co"]
+    group_members = [
+        f"{co}|{stop_id}",
+        *[f"{co}|{nearby_stop_id}" for co, nearby_stop_id in stop_group],
+    ]
+    return "||".join(sorted(group_members))
+
+
 # Main function to process stops
 
 
@@ -295,10 +311,9 @@ def merge_stop_list() -> None:
             stop_list_grid[grid_id].append(stop_id)
 
     target_stop_list = list(stop_list.items())
-    stop_map: dict[str, StopGroup] = {}
+    stop_map: set[StopGroupStr] = set()
     distance_cache: DistanceCache = {}
     count = 0
-    group_count = 0
 
     for stop_id, stop in target_stop_list:
         count += 1
@@ -314,14 +329,15 @@ def merge_stop_list() -> None:
             stop_id,
         )
         if len(stop_group) > 0:
-            group_count += 1
-            stop_map[stop_id] = stop_group
+            stop_map.add(
+                get_stop_group_str(stop_id, stop_group, stop_seq_mapping, stop_list)
+            )
 
     logger.info(
-        f"Processed {count} stops ({group_count} groups) at {(time.time() - start_time) * 1000:.2f}ms"
+        f"Processed {count} stops ({len(stop_map)} groups) at {(time.time() - start_time) * 1000:.2f}ms"
     )
 
-    db["stopMap"] = stop_map
+    db["stopMap"] = sorted(stop_map)
 
     with open(DATA_DIR / "routeFareList.json", "w", encoding="UTF-8") as f:
         json.dump(db, f, ensure_ascii=False)

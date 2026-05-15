@@ -147,8 +147,9 @@ def isOrigDestSameEnName(co_route, w_route):
     )
 
 
-def getStopObj(co_stop):
+def getStopObj(co, co_stop):
     return {
+        "co": co,
         "name": {
             "en": co_stop["name_en"],
             "tc": co_stop["name_tc"],
@@ -175,7 +176,7 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
     for co_stop_id, co_stop in co_stop_list.items():
         if co_stop_id not in whole_stop_list:
             try:
-                whole_stop_list[co_stop_id] = getStopObj(co_stop)
+                whole_stop_list[co_stop_id] = getStopObj(co, co_stop)
             except BaseException:
                 print("Problematic stop: ", co_stop_id, file=stderr)
 
