@@ -1,4 +1,14 @@
+from crawling.gtfs_fare import fare_list_to_csv, get_fare
 from crawling.nlb import get_route_obj, get_stop_obj
+
+
+def test_fare_list_to_csv():
+    csv = fare_list_to_csv(["12.7", "12.7", "9.4"])
+
+    assert csv == ",2-4\n1-2,12.7\n3-3,9.4"
+    assert get_fare(csv, 1, 2) == 12.7
+    assert get_fare(csv, 2, 4) == 12.7
+    assert get_fare(csv, 3, 4) == 9.4
 
 
 def test_get_route_obj():
@@ -38,8 +48,8 @@ def test_get_route_obj():
         "dest_sc": "梅窝码头",
         "service_type": "1",
         "stops": ["221", "305"],
-        "fares": ["12.7"],
-        "faresHoliday": ["21.4"],
+        "fares": ",2-2\n1-1,12.7",
+        "faresHoliday": ",2-2\n1-1,21.4",
         "someDepartureObserveOnly": [1],
         "co": "nlb",
     }
