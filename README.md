@@ -64,6 +64,7 @@ To fetch data, run the followings,
 poetry run python ./crawling/parseHoliday.py
 poetry run python ./crawling/ctb_crawl.py
 poetry run python ./crawling/ctb.py
+poetry run python ./crawling/kmb_crawl.py
 poetry run python ./crawling/kmb.py
 poetry run python ./crawling/nlb_crawl.py
 poetry run python ./crawling/nlb.py
