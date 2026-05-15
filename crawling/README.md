@@ -1,44 +1,47 @@
 # Crawling Scripts — Dependency Reference
 
-Scripts must run in layer order. Within each layer, scripts are independent and can run in parallel.
+Scripts must run after their listed inputs exist. Layers describe the earliest point each script can run; scripts in the same layer can run in parallel when their `Reads` columns do not depend on another script in that layer.
 
 ## Dependency Layers
 
-### Layer 1 — Independent (pure API fetchers)
-
-| Script | Output files |
-|--------|-------------|
-| `parseHoliday.py` | `holiday.json` |
-| `ctb.py` | `routeList.ctb.json`, `stopList.ctb.json` |
-| `kmb.py` | `routeList.kmb.json`, `stopList.kmb.json` |
-| `nlb.py` | `routeList.nlb.json`, `stopList.nlb.json` |
-| `lrtfeeder.py` | `routeList.lrtfeeder.json`, `stopList.lrtfeeder.json` |
-| `lightRail.py` | `routeList.lightRail.json`, `stopList.lightRail.json` |
-| `mtr.py` | `routeList.mtr.json`, `stopList.mtr.json` |
-| `parseJourneyTime.py` | `routeTime.json` |
-| `mtrExits.py` | `exits.mtr.json` _(terminal — nothing downstream reads this)_ |
-
-### Layer 2 — Needs `routeTime.json`
+### Layer 1 — GTFS bootstrap
 
 | Script | Reads | Output files |
 |--------|-------|-------------|
-| `parseGtfs.py` | `routeTime.json` | `gtfs.zip`, `gtfs-tc/` (extracted), `gtfs.json` |
-| `parseGtfsEn.py` | `routeTime.json` | `gtfs-en.zip`, `gtfs-en/` (extracted), `gtfs-en.json` |
+| `parseJourneyTime.py` | - | `routeTime.json` |
+| `parseGtfs.py` | `routeTime.json` | `gtfs-tc.zip`, `gtfs-en.zip`, `gtfs-sc.zip`, `gtfs-tc/`, `gtfs-en/`, `gtfs-sc/`, `gtfs.json` |
 
-These two can run in parallel with each other.
+`parseGtfs.py` can run at the beginning of the pipeline as soon as `parseJourneyTime.py` has created `routeTime.json`.
 
-### Layer 3 — Needs `gtfs.json` and/or `gtfs-en.json`
+### Layer 2 — Independent raw/API preparation
 
 | Script | Reads | Output files |
 |--------|-------|-------------|
-| `gmb.py` | `gtfs-tc/calendar.txt`, `gtfs.json` | `routeList.gmb.json`, `stopList.gmb.json` |
-| `sunferry.py` | `gtfs.json`, `gtfs-en.json` | `routeList.sunferry.json`, `stopList.sunferry.json` |
-| `fortuneferry.py` | `gtfs.json`, `gtfs-en.json` | `routeList.fortuneferry.json`, `stopList.fortuneferry.json` |
-| `hkkf.py` | `gtfs.json`, `gtfs-en.json` | `routeList.hkkf.json`, `stopList.hkkf.json` |
+| `parseHoliday.py` | - | `holiday.json` |
+| `ctb_crawl.py` | - | `ctb.raw.routeList.json`, `ctb.raw.routeStopList.json`, `ctb.raw.stopList.json` |
+| `ctb.py` | `ctb.raw.routeList.json`, `ctb.raw.routeStopList.json`, `ctb.raw.stopList.json` | `routeList.ctb.json`, `stopList.ctb.json` |
+| `kmb_crawl.py` | - | `kmb.raw.routeList.json`, `kmb.raw.routeStopList.json`, `kmb.raw.stopList.json` |
+| `kmb.py` | `kmb.raw.routeList.json`, `kmb.raw.routeStopList.json`, `kmb.raw.stopList.json` | `routeList.kmb.json`, `stopList.kmb.json` |
+| `nlb_crawl.py` | - | `nlb.raw.routeList.json`, `nlb.raw.routeStopList.json`, `nlb.raw.stopList.json` |
+| `nlb.py` | `nlb.raw.routeList.json`, `nlb.raw.routeStopList.json`, `nlb.raw.stopList.json` | `routeList.nlb.json`, `stopList.nlb.json` |
+| `lrtfeeder.py` | - | `routeList.lrtfeeder.json`, `stopList.lrtfeeder.json` |
+| `lightRail.py` | - | `routeList.lightRail.json`, `stopList.lightRail.json` |
+| `mtr.py` | - | `routeList.mtr.json`, `stopList.mtr.json` |
+| `gmb_crawl.py` | - | `gmb.raw.routeNoList.json`, `gmb.raw.routeList.json`, `gmb.raw.routeStopList.json`, `gmb.raw.stopList.json` |
+| `hkkf.py` | - | `routeList.hkkf.json`, `stopList.hkkf.json` |
+| `mtrExits.py` | - | `exits.mtr.json` _(terminal — nothing downstream reads this)_ |
 
-All four can run in parallel once Layer 2 completes.
+### Layer 3 — Needs `gtfs.json`
 
-### Layer 4 — Needs `gtfs.json` + all `routeList`/`stopList` from layers 1 & 3
+| Script | Reads | Output files |
+|--------|-------|-------------|
+| `gmb.py` | `gmb.raw.routeNoList.json`, `gmb.raw.routeList.json`, `gmb.raw.routeStopList.json`, `gmb.raw.stopList.json`, `gtfs-tc/calendar.txt`, `gtfs.json` | `routeList.gmb.json`, `stopList.gmb.json` |
+| `sunferry.py` | `gtfs.json` | `routeList.sunferry.json`, `stopList.sunferry.json` |
+| `fortuneferry.py` | `gtfs.json` | `routeList.fortuneferry.json`, `stopList.fortuneferry.json` |
+
+These can run once Layer 1 completes and any listed raw files from Layer 2 exist.
+
+### Layer 4 — Needs `gtfs.json` + all provider `routeList`/`stopList` files
 
 | Script | Reads | Output files |
 |--------|-------|-------------|
@@ -73,7 +76,11 @@ All four can run in parallel once Layer 2 completes.
 ## Key notes
 
 - **`gmb.py` is not independent** despite looking like the other operator scripts. It reads `gtfs-tc/calendar.txt` (produced by `parseGtfs.py`), making it a Layer 3 script.
-- **`sunferry.py`, `fortuneferry.py`, `hkkf.py`** require *both* `gtfs.json` and `gtfs-en.json`, so they must wait for both `parseGtfs.py` and `parseGtfsEn.py`.
-- **`mergeRoutes.py`** has a cross-layer dependency on `holiday.json` from Layer 1, so `parseHoliday.py` must complete before Layer 6.
+- **`kmb.py` reads raw files from `kmb_crawl.py`**. Run `kmb_crawl.py` first when rebuilding from an empty `data/` directory.
+- **`nlb.py` reads raw files from `nlb_crawl.py`**. Run `nlb_crawl.py` first when rebuilding from an empty `data/` directory.
+- **`parseGtfs.py` can run at the start** after `parseJourneyTime.py`, because `routeTime.json` is its only generated input.
+- **`sunferry.py` and `fortuneferry.py`** require `gtfs.json`, so they must wait for `parseGtfs.py`.
+- **`gmb.py` reads raw files from `gmb_crawl.py`** plus GTFS calendar data. Run `gmb_crawl.py` and `parseGtfs.py` before `gmb.py`.
+- **`mergeRoutes.py`** has a cross-layer dependency on `holiday.json` from Layer 2, so `parseHoliday.py` must complete before Layer 6.
 - **`mtrExits.py`** is fully independent and can run at any time — nothing downstream consumes its output.
-- The current workflow (`fetch-data.yml`) runs all scripts sequentially; layers 1 and 3 are candidates for parallelisation.
+- The current workflow (`fetch-data.yml`) runs all scripts sequentially; independent scripts in layers 2 and 3 are candidates for parallelisation.

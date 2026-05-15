@@ -61,6 +61,8 @@ poetry install --no-root
 
 To fetch data, run the followings,
 ```
+poetry run python ./crawling/parseJourneyTime.py
+poetry run python ./crawling/parseGtfs.py
 poetry run python ./crawling/parseHoliday.py
 poetry run python ./crawling/ctb_crawl.py
 poetry run python ./crawling/ctb.py
@@ -71,8 +73,6 @@ poetry run python ./crawling/nlb.py
 poetry run python ./crawling/lrtfeeder.py
 poetry run python ./crawling/lightRail.py
 poetry run python ./crawling/mtr.py
-poetry run python ./crawling/parseJourneyTime.py
-poetry run python ./crawling/parseGtfs.py
 poetry run python ./crawling/sunferry.py
 poetry run python ./crawling/fortuneferry.py
 poetry run python ./crawling/hkkf.py

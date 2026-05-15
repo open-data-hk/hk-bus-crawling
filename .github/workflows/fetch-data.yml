@@ -94,6 +94,8 @@ jobs:
           REQUEST_LIMIT: "6"
         run: |
           set -o xtrace
+          poetry run python ./crawling/parseJourneyTime.py
+          poetry run python ./crawling/parseGtfs.py
           poetry run python ./crawling/parseHoliday.py
           poetry run python ./crawling/ctb_crawl.py
           poetry run python ./crawling/ctb.py
@@ -104,8 +106,6 @@ jobs:
           poetry run python ./crawling/lrtfeeder.py
           poetry run python ./crawling/lightRail.py
           poetry run python ./crawling/mtr.py
-          poetry run python ./crawling/parseJourneyTime.py
-          poetry run python ./crawling/parseGtfs.py
           poetry run python ./crawling/gmb_crawl.py
           poetry run python ./crawling/gmb.py
           poetry run python ./crawling/sunferry.py
