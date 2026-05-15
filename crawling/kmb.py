@@ -2,97 +2,111 @@ import asyncio
 import copy
 import json
 import logging
-import sys
-from os import path
+from pathlib import Path
 
-import httpx
-from crawl_utils import dump_provider_data, emitRequest
-from schemas import ProviderRoute, ProviderStop
-from utils import DATA_DIR
+try:
+    from .crawl_utils import dump_provider_data
+    from .kmb_crawl import (
+        RAW_ROUTE_LIST,
+        RAW_ROUTE_STOP_LIST,
+        RAW_STOP_LIST,
+    )
+    from .schemas import ProviderRoute, ProviderStop
+except ImportError:
+    from crawl_utils import dump_provider_data
+    from kmb_crawl import (
+        RAW_ROUTE_LIST,
+        RAW_ROUTE_STOP_LIST,
+        RAW_STOP_LIST,
+    )
+    from schemas import ProviderRoute, ProviderStop
 
-BASE_URL = "https://data.etabus.gov.hk/v1/transport/kmb"
+logger = logging.getLogger(__name__)
 
 
-def stops_url():
-    return BASE_URL + "/stop"
+def load_raw_json(path: Path):
+    if not path.exists():
+        raise FileNotFoundError(
+            f"{path} does not exist. Run crawling/kmb_crawl.py first."
+        )
+    return json.loads(path.read_text("utf-8"))
 
 
-def routes_url():
-    return BASE_URL + "/route/"
+def ensure_raw_files_exist():
+    missing_files = [
+        path
+        for path in [RAW_ROUTE_LIST, RAW_ROUTE_STOP_LIST, RAW_STOP_LIST]
+        if not path.exists()
+    ]
+    if missing_files:
+        missing_file_list = ", ".join(str(path) for path in missing_files)
+        raise FileNotFoundError(
+            f"Missing KMB raw file(s): {missing_file_list}. "
+            "Run crawling/kmb_crawl.py first."
+        )
 
 
-def route_stops_url():
-    return BASE_URL + "/route-stop/"
+def get_stop_list(raw_stop_list: list[dict]) -> dict[str, ProviderStop]:
+    stop_list = {}
+    for stop in raw_stop_list:
+        stop = {**stop}
+        stop["lng"] = stop.pop("long")
+        stop_list[stop["stop"]] = stop
+    return stop_list
 
 
-async def getRouteStop():
-    a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
-    # define output name
-    ROUTE_LIST = DATA_DIR / "routeList.kmb.json"
-    STOP_LIST = DATA_DIR / "stopList.kmb.json"
+def route_key(route: str, service_type: str, bound: str) -> str:
+    return "+".join([route, service_type, bound])
 
-    if path.isfile(ROUTE_LIST):
-        return
 
-    stopList: dict[str, ProviderStop] = {}
-    if path.isfile(STOP_LIST):
-        with open(STOP_LIST, "r", encoding="UTF-8") as f:
-            stopList = json.load(f)
-    else:
-        # load stops
-        r = await emitRequest(stops_url(), a_client)
-        _stopList = r.json()["data"]
-        for stop in _stopList:
-            stopList[stop["stop"]] = stop
-            stop["lng"] = stop.pop("long")
-
-    def isStopExist(stopId):
-        if stopId not in stopList:
-            print("Not exist stop: ", stopId, file=sys.stderr)
-        return stopId in stopList
-
-    # load route list
-    routeList = {}
-    # load routes
-    r = await emitRequest(routes_url(), a_client)
-    for route in r.json()["data"]:
-        route["stops"] = {}
-        route["co"] = "kmb"
-        routeList["+".join([route["route"], route["service_type"], route["bound"]])] = (
+def get_route_list(
+    raw_route_list: list[dict],
+    raw_route_stop_list: list[dict],
+    stop_list: dict[str, ProviderStop],
+) -> list[ProviderRoute]:
+    route_map = {}
+    for route in raw_route_list:
+        route = {**route, "stops": {}, "co": "kmb"}
+        route_map[route_key(route["route"], route["service_type"], route["bound"])] = (
             route
         )
 
-    # load route stops
-    r = await emitRequest(route_stops_url(), a_client)
-    for stop in r.json()["data"]:
-        routeKey = "+".join([stop["route"], stop["service_type"], stop["bound"]])
-        if routeKey in routeList:
-            routeList[routeKey]["stops"][int(stop["seq"])] = stop["stop"]
-        else:
-            # if route not found, clone it from service type = 1
-            _routeKey = "+".join([stop["route"], str("1"), stop["bound"]])
-            routeList[routeKey] = copy.deepcopy(routeList[_routeKey])
-            routeList[routeKey]["stops"] = {}
-            routeList[routeKey]["stops"][int(stop["seq"])] = stop["stop"]
+    for stop in raw_route_stop_list:
+        key = route_key(stop["route"], stop["service_type"], stop["bound"])
+        if key not in route_map:
+            base_key = route_key(stop["route"], "1", stop["bound"])
+            route_map[key] = copy.deepcopy(route_map[base_key])
+            route_map[key]["stops"] = {}
+        route_map[key]["stops"][int(stop["seq"])] = stop["stop"]
 
-    # flatten the route stops back to array
-    for routeKey in routeList.keys():
-        stops = [
-            routeList[routeKey]["stops"][seq]
-            for seq in sorted(routeList[routeKey]["stops"].keys())
+    for key, route in route_map.items():
+        stops = [route["stops"][seq] for seq in sorted(route["stops"].keys())]
+        route["stops"] = [
+            stop_id for stop_id in stops if is_stop_exist(stop_id, stop_list)
         ]
-        # filter non-exist stops
-        stops = list(filter(isStopExist, stops))
-        routeList[routeKey]["stops"] = stops
 
-    # flatten the routeList back to array
-    routeList: list[ProviderRoute] = [
-        routeList[routeKey]
-        for routeKey in routeList.keys()
-        if not routeKey.startswith("K")
-    ]
+    return [route_map[key] for key in route_map.keys() if not key.startswith("K")]
 
-    dump_provider_data("kmb", routeList, stopList)
+
+def is_stop_exist(stop_id: str, stop_list: dict[str, ProviderStop]) -> bool:
+    if stop_id not in stop_list:
+        logger.warning(f"Not exist stop: {stop_id}")
+    return stop_id in stop_list
+
+
+async def getRouteStop():
+    ensure_raw_files_exist()
+
+    raw_stop_list = load_raw_json(RAW_STOP_LIST)
+    raw_route_list = load_raw_json(RAW_ROUTE_LIST)
+    raw_route_stop_list = load_raw_json(RAW_ROUTE_STOP_LIST)
+
+    logger.info("Preparing data of kmb")
+
+    stop_list = get_stop_list(raw_stop_list)
+    route_list = get_route_list(raw_route_list, raw_route_stop_list, stop_list)
+
+    dump_provider_data("kmb", route_list, stop_list)
 
 
 if __name__ == "__main__":
