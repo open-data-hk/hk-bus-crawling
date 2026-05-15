@@ -3,29 +3,34 @@ import json
 from utils import DATA_DIR
 
 
-def isNameMatch(name_a, name_b):
-    tmp_a = name_a.lower()
-    tmp_b = name_b.lower()
-    return tmp_a.find(tmp_b) >= 0 or tmp_b.find(tmp_a) >= 0
+def is_name_match(name_a: str, name_b: str) -> bool:
+    """Match two string by checking its lowercase is substring of each other"""
+    lower_a = name_a.lower()
+    lower_b = name_b.lower()
+    return lower_a in lower_b or lower_b in lower_a
 
 
-def _time_to_min(t):
+def _time_to_min(t: str) -> int:
+    """e.g. 0730xxxxx = 07 x 60 + 30 = 450"""
     return int(t[:2]) * 60 + int(t[2:4])
 
 
-def countBus(freq):
+def count_services(freq: dict[str, str] | None) -> int:
+    """
+    Calculate total number of service with provided freq dict (value is compressed freq string)
+    """
     if freq is None:
         return 0
     total = 0
-    for s in freq.values():
-        tokens = s.split("|")
-        for i, token in enumerate(tokens):
+    for freq_str in freq.values():
+        start_freq_str = freq_str.split("|")
+        for i, token in enumerate(start_freq_str):
             if "," in token:
-                start, headway = token.split(",")
-                if i + 1 < len(tokens):
-                    end = tokens[i + 1].split(",")[0]
-                    total += (_time_to_min(end) - _time_to_min(start)) / int(headway)
-            elif i == 0 or "," not in tokens[i - 1]:
+                start, freq_mins = token.split(",")
+                if i + 1 < len(start_freq_str):
+                    end = start_freq_str[i + 1].split(",")[0]
+                    total += (_time_to_min(end) - _time_to_min(start)) / int(freq_mins)
+            elif i == 0 or "," not in start_freq_str[i - 1]:
                 total += 1
     return total
 
@@ -34,39 +39,38 @@ def cleansing(co):
     with open(DATA_DIR / ("routeFareList.%s.json" % co), "r", encoding="UTF-8") as f:
         routeList = json.load(f)
 
-    for i in range(len(routeList)):
-        route = routeList[i]
-        route["co"] = [co for co in route["co"] if co != "ferry"]
-        if "skip" in route or "freq" in route:
+    for i, route_i in enumerate(routeList):
+        route_i["co"] = [co for co in route_i["co"] if co != "ferry"]
+        if "skip" in route_i or "freq" in route_i:
             continue
         bestIdx, maxBus = -1, 0
-        for j in range(len(routeList)):
+        for j, route_j in enumerate(routeList):
             if i == j:
                 continue
-            _route = routeList[j]
             if (
-                route["route"] == _route["route"]
-                and sorted(route["co"]) == sorted(_route["co"])
-                and isNameMatch(route["orig_en"], _route["orig_en"])
-                and isNameMatch(route["dest_en"], _route["dest_en"])
+                route_i["route"] == route_j["route"]
+                and sorted(route_i["co"]) == sorted(route_j["co"])
+                and is_name_match(route_i["orig_en"], route_j["orig_en"])
+                and is_name_match(route_i["dest_en"], route_j["dest_en"])
             ):
-                if "freq" not in _route:
+                # TODO: check operator routes has "freq" set, now it always skip as "freq" not found
+                if "freq" not in route_j:
                     continue
-                bus = countBus(_route["freq"])
+                bus = count_services(route_j["freq"])
                 if bus > maxBus:
                     bestIdx = j
                     maxBus = bus
         if bestIdx != -1:
             routeList[bestIdx]["service_type"] = (
                 1
-                if "service_type" not in routeList[i]
+                if "service_type" not in route_i
                 else routeList[bestIdx]["service_type"]
             )
             if (
-                len(routeList[i]["stops"]) <= 0
-                or routeList[i]["stops"] == routeList[bestIdx]["stops"]
+                len(route_i["stops"]) <= 0
+                or route_i["stops"] == routeList[bestIdx]["stops"]
             ):
-                routeList[i]["skip"] = True
+                route_i["skip"] = True
 
     _routeList = [route for route in routeList if "skip" not in route]
     print(co, len(routeList), len(_routeList))
