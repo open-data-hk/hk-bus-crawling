@@ -148,11 +148,6 @@ def load_unmatched_co_route_exemptions() -> dict[str, set[str] | None]:
             if exempt_routes is not None:
                 exempt_routes.update(routes)
 
-    # The current KMB feed includes LWB routes, but keep the source list separate.
-    kmb_exempt_routes = exemptions["kmb"]
-    lwb_exempt_routes = exemptions.get("lwb")
-    if kmb_exempt_routes is not None and lwb_exempt_routes is not None:
-        kmb_exempt_routes.update(lwb_exempt_routes)
     return exemptions
 
 
@@ -1175,6 +1170,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
 
 
 match_co_routes_with_gtfs("kmb")
+match_co_routes_with_gtfs("lwb")
 match_co_routes_with_gtfs("ctb")
 match_co_routes_with_gtfs("nlb")
 match_co_routes_with_gtfs("lrtfeeder")

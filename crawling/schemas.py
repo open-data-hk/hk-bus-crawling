@@ -9,6 +9,7 @@ ProviderCode = Literal[
     "hkkf",
     "kmb",
     "lightRail",
+    "lwb",
     "lrtfeeder",
     "mtr",
     "nlb",

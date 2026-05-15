@@ -82,6 +82,7 @@ def cleansing(co):
 
 
 cleansing("kmb")
+cleansing("lwb")
 cleansing("ctb")
 cleansing("nlb")
 cleansing("lrtfeeder")
