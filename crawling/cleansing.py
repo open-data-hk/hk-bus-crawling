@@ -34,39 +34,37 @@ def cleansing(co):
     with open(DATA_DIR / ("routeFareList.%s.json" % co), "r", encoding="UTF-8") as f:
         routeList = json.load(f)
 
-    for i in range(len(routeList)):
-        route = routeList[i]
-        route["co"] = [co for co in route["co"] if co != "ferry"]
-        if "skip" in route or "freq" in route:
+    for i, route_i in enumerate(routeList):
+        route_i["co"] = [co for co in route_i["co"] if co != "ferry"]
+        if "skip" in route_i or "freq" in route_i:
             continue
         bestIdx, maxBus = -1, 0
-        for j in range(len(routeList)):
+        for j, route_j in enumerate(routeList):
             if i == j:
                 continue
-            _route = routeList[j]
             if (
-                route["route"] == _route["route"]
-                and sorted(route["co"]) == sorted(_route["co"])
-                and isNameMatch(route["orig_en"], _route["orig_en"])
-                and isNameMatch(route["dest_en"], _route["dest_en"])
+                route_i["route"] == route_j["route"]
+                and sorted(route_i["co"]) == sorted(route_j["co"])
+                and isNameMatch(route_i["orig_en"], route_j["orig_en"])
+                and isNameMatch(route_i["dest_en"], route_j["dest_en"])
             ):
-                if "freq" not in _route:
+                if "freq" not in route_j:
                     continue
-                bus = countBus(_route["freq"])
+                bus = countBus(route_j["freq"])
                 if bus > maxBus:
                     bestIdx = j
                     maxBus = bus
         if bestIdx != -1:
             routeList[bestIdx]["service_type"] = (
                 1
-                if "service_type" not in routeList[i]
+                if "service_type" not in route_i
                 else routeList[bestIdx]["service_type"]
             )
             if (
-                len(routeList[i]["stops"]) <= 0
-                or routeList[i]["stops"] == routeList[bestIdx]["stops"]
+                len(route_i["stops"]) <= 0
+                or route_i["stops"] == routeList[bestIdx]["stops"]
             ):
-                routeList[i]["skip"] = True
+                route_i["skip"] = True
 
     _routeList = [route for route in routeList if "skip" not in route]
     print(co, len(routeList), len(_routeList))
