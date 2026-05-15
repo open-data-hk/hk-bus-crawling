@@ -53,6 +53,7 @@ def cleansing(co):
                 and is_name_match(route_i["orig_en"], route_j["orig_en"])
                 and is_name_match(route_i["dest_en"], route_j["dest_en"])
             ):
+                # TODO: check operator routes has "freq" set, now it always skip as "freq" not found
                 if "freq" not in route_j:
                     continue
                 bus = count_services(route_j["freq"])
