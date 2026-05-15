@@ -5,6 +5,7 @@ from pathlib import Path
 
 try:
     from .crawl_utils import dump_provider_data
+    from .gtfs_fare import fare_list_to_csv
     from .nlb_crawl import (
         RAW_ROUTE_LIST,
         RAW_ROUTE_STOP_LIST,
@@ -13,6 +14,7 @@ try:
     from .schemas import ProviderRoute, ProviderStop
 except ImportError:
     from crawl_utils import dump_provider_data
+    from gtfs_fare import fare_list_to_csv
     from nlb_crawl import (
         RAW_ROUTE_LIST,
         RAW_ROUTE_STOP_LIST,
@@ -67,8 +69,8 @@ def get_route_obj(co: str, route: dict, route_stops: list[dict]) -> ProviderRout
             1 + route["overnightRoute"] * 2 + route["specialRoute"] * 4
         ),
         "stops": stop_ids,
-        "fares": fares[0:-1],
-        "faresHoliday": fares_holiday[0:-1],
+        "fares": fare_list_to_csv(fares[0:-1]),
+        "faresHoliday": fare_list_to_csv(fares_holiday[0:-1]),
         "someDepartureObserveOnly": some_departure_observe_only[0:-1],
         "co": co,
     }

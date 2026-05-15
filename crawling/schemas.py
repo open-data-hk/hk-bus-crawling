@@ -37,7 +37,7 @@ class ProviderRoute(TypedDict):
     gtfs_route_seq: NotRequired[str]
     freq: NotRequired[dict[str, Any]]
     fares: NotRequired[str | list[str | float]]
-    faresHoliday: NotRequired[list[str | float]]
+    faresHoliday: NotRequired[str | list[str | float]]
 
 
 class ProviderStop(TypedDict):

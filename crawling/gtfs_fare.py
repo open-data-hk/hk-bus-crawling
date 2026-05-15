@@ -1,3 +1,8 @@
+from collections import namedtuple
+
+FareRecord = namedtuple("FareRecord", ["on_seq", "off_seq", "price"])
+
+
 def compress_fares(fares):
     """Compress flat fare records into a compact (off-section × on-group) matrix.
 
@@ -51,6 +56,17 @@ def compress_fares(fares):
         groups.append((group_start, prev_on, list(prev_vec)))
 
     return sections, groups
+
+
+def fare_list_to_csv(fares):
+    """Convert per-boarding-stop fares to the compact fare CSV format."""
+    fare_records = [
+        FareRecord(on_seq, off_seq, fare)
+        for on_seq, fare in enumerate(fares, start=1)
+        for off_seq in range(on_seq + 1, len(fares) + 2)
+    ]
+    sections, groups = compress_fares(fare_records)
+    return fares_to_csv(sections, groups)
 
 
 def fares_to_csv(sections, groups):
