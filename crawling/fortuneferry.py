@@ -40,7 +40,7 @@ def main():
                     routeList.append(
                         {
                             "co": co,
-                            "gtfs_id": route_id,
+                            "gtfs_route_id": route_id,
                             "gtfs_route_seq": "1",
                             "route": route_code,
                             "orig_tc": gtfsRoute["orig"]["tc"],
@@ -59,7 +59,7 @@ def main():
                         routeList.append(
                             {
                                 "co": co,
-                                "gtfs_id": route_id,
+                                "gtfs_route_id": route_id,
                                 "gtfs_route_seq": "2",
                                 "route": route_code,
                                 "dest_tc": gtfsRoute["orig"]["tc"],

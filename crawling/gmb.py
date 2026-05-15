@@ -193,7 +193,7 @@ async def getRouteStop(co):
             routeList.append(
                 {
                     "co": co,
-                    "gtfs_id": str(route["route_id"]),
+                    "gtfs_route_id": str(route["route_id"]),
                     "route": route_no,
                     "orig_tc": direction["orig_tc"],
                     "orig_sc": direction["orig_sc"],
@@ -221,7 +221,7 @@ async def getRouteStop(co):
     for route_id, route in all_routes.items():
         process_route_directions(route, route["route_code"], all_route_stops)
 
-    routeList.sort(key=lambda a: a["gtfs_id"])
+    routeList.sort(key=lambda a: a["gtfs_route_id"])
     logger.info("Route done")
 
     with open(DATA_DIR / "gtfs.json", "r", encoding="UTF-8") as f:

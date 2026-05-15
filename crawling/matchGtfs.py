@@ -71,7 +71,7 @@ class Route(TypedDict, total=False):
     dest_sc: str
     service_type: str
     stops: list[str]
-    gtfs_id: str
+    gtfs_route_id: str
     gtfs_route_seq: str
     virtual: bool
     _source_route_ids: list[int]
@@ -90,7 +90,7 @@ class Route(TypedDict, total=False):
 # (gtfs_stop_index, co_stop_index) alignment pair produced by the DP backtrack
 StopMatch = tuple[int, int]
 
-# Full best-match tuple: (gtfsId, avgDist, stopPairs, bound, gtfsStopIds, route)
+# Full best-match tuple: (gtfsRouteId, avgDist, stopPairs, bound, gtfsStopIds, route)
 BestMatch = tuple[str, float, list[StopMatch], str, list[str], Route]
 
 # GTFS uses "ferry" as the operator code for all ferry companies.
@@ -753,7 +753,7 @@ def printStopMatches(
 
     Args:
         best_match: The best-match 6-tuple from the route-matching loop:
-            ``(gtfsId, avgDist, stopIndexPairs, bound, gtfsStopIds, route)``.
+            ``(gtfsRouteId, avgDist, stopIndexPairs, bound, gtfsStopIds, route)``.
         gtfsStops: Full GTFS stop dictionary keyed by stop ID.
         stopList: Operator stop dictionary keyed by stop ID.
         co: Operator code used to look up the stop name inside GTFS data.
@@ -766,13 +766,13 @@ def printStopMatches(
         2  大圍站               |   大圍
     """
 
-    gtfsId, avgDist, stopIndexPairs, bound, gtfsStopIds, route = best_match
+    gtfsRouteId, avgDist, stopIndexPairs, bound, gtfsStopIds, route = best_match
 
     stopPair = [
         (gtfsStopIds[gtfsStopIdx], route["stops"][routeStopIdx])
         for gtfsStopIdx, routeStopIdx in stopIndexPairs
     ]
-    print(bound, gtfsId, avgDist)
+    print(bound, gtfsRouteId, avgDist)
     print("\t|\t".join(["運輸處", co]))
     print(
         "\n".join(
@@ -940,7 +940,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
         debug = False and gtfs_id == "1047" and gtfs_route["orig"]["tc"] == "沙田站"
         if co == "gmb":  # handle for gmb
             for co_route in co_routes:
-                if co_route["gtfs_id"] == gtfs_id:
+                if co_route["gtfs_route_id"] == gtfs_id:
                     route_seq = get_route_seq_for_provider_route(gtfs_route, co_route)
                     attach_gtfs_route_seq(co_route, route_seq)
                     co_route["fares"] = gtfs_route["fares"].get(route_seq)
@@ -950,7 +950,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
                     mark_gtfs_route_seq_matched(gtfs_route, route_seq, co, co_route)
         elif co in ["sunferry", "fortuneferry"]:
             for co_route in co_routes:
-                if co_route["gtfs_id"] == gtfs_id:
+                if co_route["gtfs_route_id"] == gtfs_id:
                     route_seq = get_route_seq_for_provider_route(gtfs_route, co_route)
                     attach_gtfs_route_seq(co_route, route_seq)
                     co_route["fares"] = gtfs_route["fares"].get(route_seq)

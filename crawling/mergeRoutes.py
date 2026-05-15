@@ -45,7 +45,7 @@ def getRouteObj(
     freq,
     jt,
     nlbId,
-    gtfsId,
+    gtfsRouteId,
     gtfsRouteSeq,
     stopAlignment=None,
     serviceType=1,
@@ -63,7 +63,7 @@ def getRouteObj(
         "freq": freq,
         "jt": jt,
         "nlbId": nlbId,
-        "gtfsId": gtfsId,
+        "gtfsRouteId": gtfsRouteId,
         "gtfsRouteSeq": gtfsRouteSeq,
         "seq": seq,
     }
@@ -87,12 +87,12 @@ def addCircularMetadataToRoute(route, co, co_route):
 
 
 def isGtfsMatch(knownRoute, newRoute):
-    if knownRoute["gtfsId"] is None:
+    if knownRoute["gtfsRouteId"] is None:
         return True
     if "gtfs" not in newRoute:
         return True
 
-    return knownRoute["gtfsId"] in newRoute["gtfs"]
+    return knownRoute["gtfsRouteId"] in newRoute["gtfs"]
 
 
 def isSameStopSequence(co_stop_ids, w_stop_ids, whole_stop_list):
@@ -203,7 +203,9 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
                 freq=co_route.get("freq", None),
                 jt=co_route.get("jt", None),
                 nlbId=co_route.get("id", None),
-                gtfsId=co_route.get("gtfs_id", co_route.get("gtfs", [None])[0]),
+                gtfsRouteId=co_route.get(
+                    "gtfs_route_id", co_route.get("gtfs", [None])[0]
+                ),
                 gtfsRouteSeq=co_route.get("gtfs_route_seq"),
                 stopAlignment=(
                     {co: co_route["stop_alignment"]}
