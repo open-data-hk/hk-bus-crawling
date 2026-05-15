@@ -23,6 +23,7 @@ PROVIDERS = [
     "fortuneferry",
     "hkkf",
 ]
+GTFS_STOP_PREFIX = "gtfs"
 
 
 def loadJson(path):
@@ -175,6 +176,108 @@ def getRouteNameObj(co_route, prefix):
         "tc": co_route[f"{prefix}_tc"].replace("/", "／"),
         "sc": co_route[f"{prefix}_sc"].replace("/", "／"),
     }
+
+
+def getGtfsStopId(stop_id):
+    return f"{GTFS_STOP_PREFIX}:{stop_id}"
+
+
+def getGtfsStopNameObj(gtfs_stop, gtfs_route):
+    stop_names = gtfs_stop.get("stopName", {})
+    for co in gtfs_route["co"]:
+        if co in stop_names:
+            return stop_names[co]
+    if stop_names:
+        return next(iter(stop_names.values()))
+    return {
+        "en": gtfs_stop["stopId"],
+        "tc": gtfs_stop["stopId"],
+        "sc": gtfs_stop["stopId"],
+    }
+
+
+def getGtfsStopObj(gtfs_stop, gtfs_route):
+    return {
+        "co": gtfs_route["co"][0],
+        "name": getGtfsStopNameObj(gtfs_stop, gtfs_route),
+        "location": {
+            "lat": float(gtfs_stop["lat"]),
+            "lng": float(gtfs_stop["lng"]),
+        },
+    }
+
+
+def getGtfsRouteSeqNameObj(gtfs_route, route_seq, prefix):
+    is_inbound = route_seq == "2" and not gtfs_route.get("is_circular")
+    gtfs_prefix = (
+        "dest"
+        if (prefix == "orig" and is_inbound)
+        else "orig" if (prefix == "dest" and is_inbound) else prefix
+    )
+    return {
+        "en": gtfs_route[gtfs_prefix]["en"].replace("/", "／"),
+        "tc": gtfs_route[gtfs_prefix]["tc"].replace("/", "／"),
+        "sc": gtfs_route[gtfs_prefix]["sc"].replace("/", "／"),
+    }
+
+
+def getGtfsRouteSeqBound(route_seq):
+    return "I" if route_seq == "2" else "O"
+
+
+def getExportedGtfsRouteSeqs(whole_route_list):
+    exported_gtfs_route_seqs = set()
+    for route in whole_route_list:
+        gtfs_route_id = route.get("gtfs_route_id")
+        gtfs_route_seq = route.get("gtfs_route_seq")
+        if gtfs_route_id is not None and gtfs_route_seq is not None:
+            exported_gtfs_route_seqs.add((gtfs_route_id, gtfs_route_seq))
+    return exported_gtfs_route_seqs
+
+
+def importUnmatchedGtfsRoutes(whole_route_list, whole_stop_list):
+    gtfs = loadJson(DATA_DIR / "gtfs.json")
+    gtfs_routes = gtfs["routeList"]
+    gtfs_stops = gtfs["stopList"]
+    exported_gtfs_route_seqs = getExportedGtfsRouteSeqs(whole_route_list)
+
+    for gtfs_route_id, gtfs_route in gtfs_routes.items():
+        for route_seq, route_seq_stops in gtfs_route["stops"].items():
+            if (gtfs_route_id, route_seq) in exported_gtfs_route_seqs:
+                continue
+
+            for stop_id in route_seq_stops:
+                gtfs_stop_id = getGtfsStopId(stop_id)
+                if gtfs_stop_id not in whole_stop_list:
+                    whole_stop_list[gtfs_stop_id] = getGtfsStopObj(
+                        gtfs_stops[stop_id], gtfs_route
+                    )
+
+            route_obj = getRouteObj(
+                route=gtfs_route["route"],
+                co=gtfs_route["co"],
+                serviceType=1,
+                stops=[
+                    (
+                        co,
+                        [getGtfsStopId(stop_id) for stop_id in route_seq_stops],
+                    )
+                    for co in gtfs_route["co"]
+                ],
+                bound={co: getGtfsRouteSeqBound(route_seq) for co in gtfs_route["co"]},
+                orig=getGtfsRouteSeqNameObj(gtfs_route, route_seq, "orig"),
+                dest=getGtfsRouteSeqNameObj(gtfs_route, route_seq, "dest"),
+                fares=gtfs_route.get("fares", {}).get(route_seq),
+                faresHoliday=None,
+                freq=gtfs_route.get("freq", {}).get(route_seq),
+                jt=gtfs_route.get("jt"),
+                nlbId=None,
+                gtfsRouteId=gtfs_route_id,
+                gtfsRouteSeq=route_seq,
+                seq=len(route_seq_stops),
+            )
+            route_obj["operators_matched"] = False
+            whole_route_list.append(route_obj)
 
 
 def importRouteListJson(co, whole_route_list, whole_stop_list):
@@ -462,6 +565,7 @@ def main():
 
     for co in PROVIDERS:
         importRouteListJson(co, routeList, stopList)
+    importUnmatchedGtfsRoutes(routeList, stopList)
 
     routeList = smartUnique(routeList)
     for route in routeList:
