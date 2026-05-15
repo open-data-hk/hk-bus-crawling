@@ -342,8 +342,9 @@ def get_route_seq_for_provider_route(
     return "1"
 
 
-def attach_gtfs_route_seq(co_route: Route, route_seq: str) -> None:
-    """Attach the matched GTFS route sequence to an operator route."""
+def attach_gtfs_route(co_route: Route, gtfs_id: str, route_seq: str) -> None:
+    """Attach the matched GTFS route id and sequence to an operator route."""
+    co_route["gtfs_route_id"] = gtfs_id
     co_route["gtfs_route_seq"] = route_seq
 
 
@@ -942,20 +943,14 @@ def match_co_routes_with_gtfs(co: str) -> None:
             for co_route in co_routes:
                 if co_route["gtfs_route_id"] == gtfs_id:
                     route_seq = get_route_seq_for_provider_route(gtfs_route, co_route)
-                    attach_gtfs_route_seq(co_route, route_seq)
-                    co_route["fares"] = gtfs_route["fares"].get(route_seq)
-                    co_route["freq"] = gtfs_route["freq"].get(route_seq)
-                    co_route["jt"] = gtfs_route["jt"]
+                    attach_gtfs_route(co_route, gtfs_id, route_seq)
                     matched_co_route_ids.add(id(co_route))
                     mark_gtfs_route_seq_matched(gtfs_route, route_seq, co, co_route)
         elif co in ["sunferry", "fortuneferry"]:
             for co_route in co_routes:
                 if co_route["gtfs_route_id"] == gtfs_id:
                     route_seq = get_route_seq_for_provider_route(gtfs_route, co_route)
-                    attach_gtfs_route_seq(co_route, route_seq)
-                    co_route["fares"] = gtfs_route["fares"].get(route_seq)
-                    co_route["freq"] = gtfs_route["freq"].get(route_seq)
-                    co_route["jt"] = gtfs_route["jt"]
+                    attach_gtfs_route(co_route, gtfs_id, route_seq)
                     matched_co_route_ids.add(id(co_route))
                     mark_gtfs_route_seq_matched(gtfs_route, route_seq, co, co_route)
         # handle for other companies
@@ -1042,7 +1037,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
 
                     route_candidate = co_route.copy()
                     route_candidate.pop("_source_route_ids", None)
-                    attach_gtfs_route_seq(route_candidate, route_seq)
+                    attach_gtfs_route(route_candidate, gtfs_id, route_seq)
                     if (
                         (
                             len(ret) == len(co_route["stops"])
@@ -1051,10 +1046,6 @@ def match_co_routes_with_gtfs(co: str) -> None:
                         and "gtfs" not in co_route
                         and "virtual" not in co_route
                     ):
-                        _fare_csv = gtfs_route["fares"].get(route_seq, "")
-                        route_candidate["fares"] = _fare_csv if _fare_csv else None
-                        route_candidate["freq"] = gtfs_route["freq"][route_seq]
-                        route_candidate["jt"] = gtfs_route["jt"]
                         route_candidate["co"] = (
                             gtfs_route["co"]
                             if co in gtfs_route["co"]
@@ -1079,10 +1070,6 @@ def match_co_routes_with_gtfs(co: str) -> None:
                         route_candidate["stops"] = [
                             co_route["stops"][j] for i, j in ret
                         ]
-                        _fare_csv = gtfs_route["fares"].get(route_seq, "")
-                        route_candidate["fares"] = _fare_csv if _fare_csv else None
-                        route_candidate["freq"] = gtfs_route["freq"][route_seq]
-                        route_candidate["jt"] = gtfs_route["jt"]
                         route_candidate["co"] = gtfs_route["co"]
                         route_candidate["orig_tc"] = co_stops[
                             route_candidate["stops"][0]
