@@ -12,6 +12,7 @@ try:
         RAW_STOP_LIST,
     )
     from .schemas import ProviderRoute, ProviderStop
+    from .utils import DATA_DIR
 except ImportError:
     from crawl_utils import dump_provider_data
     from kmb_crawl import (
@@ -20,8 +21,10 @@ except ImportError:
         RAW_STOP_LIST,
     )
     from schemas import ProviderRoute, ProviderStop
+    from utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
+GTFS_JSON = DATA_DIR / "gtfs.json"
 
 
 def load_raw_json(path: Path):
@@ -55,6 +58,19 @@ def get_stop_list(raw_stop_list: list[dict]) -> dict[str, ProviderStop]:
     return stop_list
 
 
+def get_lwb_route_numbers() -> set[str]:
+    if not GTFS_JSON.exists():
+        raise FileNotFoundError(f"{GTFS_JSON} does not exist. Run parseGtfs.py first.")
+
+    gtfs = json.loads(GTFS_JSON.read_text("utf-8"))
+    lwb_route_numbers = {
+        route["route"]
+        for route in gtfs["routeList"].values()
+        if "lwb" in route.get("co", [])
+    }
+    return lwb_route_numbers
+
+
 def route_key(route: str, service_type: str, bound: str) -> str:
     return "+".join([route, service_type, bound])
 
@@ -63,10 +79,13 @@ def get_route_list(
     raw_route_list: list[dict],
     raw_route_stop_list: list[dict],
     stop_list: dict[str, ProviderStop],
+    lwb_route_numbers: set[str] | None = None,
 ) -> list[ProviderRoute]:
+    lwb_route_numbers = lwb_route_numbers or set()
     route_map = {}
     for route in raw_route_list:
-        route = {**route, "stops": {}, "co": "kmb"}
+        co = "lwb" if route["route"] in lwb_route_numbers else "kmb"
+        route = {**route, "stops": {}, "co": co}
         route_map[route_key(route["route"], route["service_type"], route["bound"])] = (
             route
         )
@@ -88,6 +107,14 @@ def get_route_list(
     return [route_map[key] for key in route_map.keys() if not key.startswith("K")]
 
 
+def get_route_stop_list(
+    route_list: list[ProviderRoute],
+    stop_list: dict[str, ProviderStop],
+) -> dict[str, ProviderStop]:
+    stop_ids = {stop_id for route in route_list for stop_id in route.get("stops", [])}
+    return {stop_id: stop for stop_id, stop in stop_list.items() if stop_id in stop_ids}
+
+
 def is_stop_exist(stop_id: str, stop_list: dict[str, ProviderStop]) -> bool:
     if stop_id not in stop_list:
         logger.warning(f"Not exist stop: {stop_id}")
@@ -101,12 +128,24 @@ async def getRouteStop():
     raw_route_list = load_raw_json(RAW_ROUTE_LIST)
     raw_route_stop_list = load_raw_json(RAW_ROUTE_STOP_LIST)
 
-    logger.info("Preparing data of kmb")
+    logger.info("Preparing data of kmb/lwb")
 
     stop_list = get_stop_list(raw_stop_list)
-    route_list = get_route_list(raw_route_list, raw_route_stop_list, stop_list)
+    route_list = get_route_list(
+        raw_route_list,
+        raw_route_stop_list,
+        stop_list,
+        get_lwb_route_numbers(),
+    )
+    kmb_route_list = [route for route in route_list if route["co"] == "kmb"]
+    lwb_route_list = [route for route in route_list if route["co"] == "lwb"]
 
-    dump_provider_data("kmb", route_list, stop_list)
+    dump_provider_data(
+        "kmb", kmb_route_list, get_route_stop_list(kmb_route_list, stop_list)
+    )
+    dump_provider_data(
+        "lwb", lwb_route_list, get_route_stop_list(lwb_route_list, stop_list)
+    )
 
 
 if __name__ == "__main__":
