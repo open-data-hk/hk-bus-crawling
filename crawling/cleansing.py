@@ -3,10 +3,11 @@ import json
 from utils import DATA_DIR
 
 
-def isNameMatch(name_a, name_b):
-    tmp_a = name_a.lower()
-    tmp_b = name_b.lower()
-    return tmp_a.find(tmp_b) >= 0 or tmp_b.find(tmp_a) >= 0
+def is_name_match(name_a: str, name_b: str) -> bool:
+    """Match two string by checking its lowercase is substring of each other"""
+    lower_a = name_a.lower()
+    lower_b = name_b.lower()
+    return lower_a in lower_b or lower_b in lower_a
 
 
 def _time_to_min(t):
@@ -45,8 +46,8 @@ def cleansing(co):
             if (
                 route_i["route"] == route_j["route"]
                 and sorted(route_i["co"]) == sorted(route_j["co"])
-                and isNameMatch(route_i["orig_en"], route_j["orig_en"])
-                and isNameMatch(route_i["dest_en"], route_j["dest_en"])
+                and is_name_match(route_i["orig_en"], route_j["orig_en"])
+                and is_name_match(route_i["dest_en"], route_j["dest_en"])
             ):
                 if "freq" not in route_j:
                     continue
