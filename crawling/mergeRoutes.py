@@ -249,6 +249,86 @@ def getRouteId(v):
     )
 
 
+def get_operator_stop_key(co, stop):
+    return f"{co}:{stop}"
+
+
+def format_stop_alignment_distance(distance):
+    if distance == 0:
+        return 0
+    if distance is None:
+        return None
+    return round(distance, 1)
+
+
+def get_stop_alignment_sort_distance(operator_stop):
+    distance = operator_stop["distance"]
+    if distance is None:
+        return float("inf")
+    return distance
+
+
+def get_gtfs_stop_map_value(operator_stop):
+    return "|".join(
+        [
+            operator_stop["co"],
+            operator_stop["stop"],
+            str(operator_stop["distance"]),
+            str(operator_stop["count"]),
+        ]
+    )
+
+
+def buildGtfsStopMap(route_list):
+    """Aggregate route stop alignments by GTFS stop."""
+    operator_stops_by_gtfs = {}
+
+    for route in route_list:
+        for co, stop_alignment in route.get("stops_and_alignment", {}).items():
+            for alignment in stop_alignment:
+                if (
+                    alignment.get("status") != "matched"
+                    or alignment.get("gtfs_stop") is None
+                    or alignment.get("co_stop") is None
+                ):
+                    continue
+
+                gtfs_stop = alignment["gtfs_stop"]
+                co_stop = alignment["co_stop"]
+                operator_stop_key = get_operator_stop_key(co, co_stop)
+                operator_stop = operator_stops_by_gtfs.setdefault(
+                    gtfs_stop, {}
+                ).setdefault(
+                    operator_stop_key,
+                    {
+                        "co": co,
+                        "stop": co_stop,
+                        "distance": format_stop_alignment_distance(
+                            alignment.get("distance")
+                        ),
+                        "count": 0,
+                    },
+                )
+                operator_stop["count"] += 1
+
+    gtfs_stop_map = {}
+    for gtfs_stop, operator_stops_by_key in operator_stops_by_gtfs.items():
+        operator_stops = sorted(
+            operator_stops_by_key.values(),
+            key=lambda operator_stop: (
+                get_stop_alignment_sort_distance(operator_stop),
+                -operator_stop["count"],
+                operator_stop["co"],
+                operator_stop["stop"],
+            ),
+        )
+        gtfs_stop_map[gtfs_stop] = [
+            get_gtfs_stop_map_value(operator_stop) for operator_stop in operator_stops
+        ]
+
+    return gtfs_stop_map
+
+
 def smartUnique(route_list):
     _routeList = []
     for i, route_i in enumerate(route_list):
@@ -378,6 +458,12 @@ def main():
     routeList = smartUnique(routeList)
     for route in routeList:
         route["stops"] = {co: stops for co, stops in route["stops"]}
+    gtfsStopMap = buildGtfsStopMap(routeList)
+    writeJson(
+        DATA_DIR / "gtfsOperatorsStopsMap.json",
+        standardizeDict(gtfsStopMap),
+        separators=(",", ":"),
+    )
     # TODO: low priority, align sequence of all operators and GTFS together, currently they are aligned separately
     # extra stop from one operator will append row individually
     # if 3 operators have the same extra stop, their will be 3 rows appended

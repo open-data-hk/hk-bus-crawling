@@ -158,6 +158,7 @@ jobs:
             data/routeTime.json
             data/gtfs-tc
             data/gtfs.json
+            data/gtfsOperatorsStopsMap.json
             data/routeGtfs*
             data/gtfs-tc.zip
             data/ROUTE_BUS.xml
@@ -176,6 +177,7 @@ jobs:
           data/routeFareList.md5 \
           CNAME \
           data/exits.mtr.json \
+          data/gtfsOperatorsStopsMap.json \
           data/0versions.json \
           build/
       - name: cp route-ts into deployment folder
