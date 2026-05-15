@@ -34,6 +34,7 @@ class ProviderRoute(TypedDict):
     id: NotRequired[str]
     service_type: NotRequired[int | str]
     gtfs_id: NotRequired[str]
+    gtfs_route_seq: NotRequired[str]
     freq: NotRequired[dict[str, Any]]
     fares: NotRequired[str | list[str | float]]
     faresHoliday: NotRequired[list[str | float]]

@@ -46,6 +46,7 @@ def getRouteObj(
     jt,
     nlbId,
     gtfsId,
+    gtfsRouteSeq,
     stopAlignment=None,
     serviceType=1,
 ):
@@ -63,6 +64,7 @@ def getRouteObj(
         "jt": jt,
         "nlbId": nlbId,
         "gtfsId": gtfsId,
+        "gtfsRouteSeq": gtfsRouteSeq,
         "seq": seq,
     }
     if stopAlignment:
@@ -202,6 +204,7 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
                 jt=co_route.get("jt", None),
                 nlbId=co_route.get("id", None),
                 gtfsId=co_route.get("gtfs_id", co_route.get("gtfs", [None])[0]),
+                gtfsRouteSeq=co_route.get("gtfs_route_seq"),
                 stopAlignment=(
                     {co: co_route["stop_alignment"]}
                     if "stop_alignment" in co_route

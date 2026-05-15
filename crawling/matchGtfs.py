@@ -72,6 +72,7 @@ class Route(TypedDict, total=False):
     service_type: str
     stops: list[str]
     gtfs_id: str
+    gtfs_route_seq: str
     virtual: bool
     _source_route_ids: list[int]
     _omit_from_export: bool
@@ -339,6 +340,11 @@ def get_route_seq_for_provider_route(
     if co_route.get("bound") == "I" and "2" in gtfs_route["stops"]:
         return "2"
     return "1"
+
+
+def attach_gtfs_route_seq(co_route: Route, route_seq: str) -> None:
+    """Attach the matched GTFS route sequence to an operator route."""
+    co_route["gtfs_route_seq"] = route_seq
 
 
 def isNameMatch(name_a: str, name_b: str) -> bool:
@@ -936,6 +942,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
             for co_route in co_routes:
                 if co_route["gtfs_id"] == gtfs_id:
                     route_seq = get_route_seq_for_provider_route(gtfs_route, co_route)
+                    attach_gtfs_route_seq(co_route, route_seq)
                     co_route["fares"] = gtfs_route["fares"].get(route_seq)
                     co_route["freq"] = gtfs_route["freq"].get(route_seq)
                     co_route["jt"] = gtfs_route["jt"]
@@ -945,6 +952,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
             for co_route in co_routes:
                 if co_route["gtfs_id"] == gtfs_id:
                     route_seq = get_route_seq_for_provider_route(gtfs_route, co_route)
+                    attach_gtfs_route_seq(co_route, route_seq)
                     co_route["fares"] = gtfs_route["fares"].get(route_seq)
                     co_route["freq"] = gtfs_route["freq"].get(route_seq)
                     co_route["jt"] = gtfs_route["jt"]
@@ -1034,6 +1042,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
 
                     route_candidate = co_route.copy()
                     route_candidate.pop("_source_route_ids", None)
+                    attach_gtfs_route_seq(route_candidate, route_seq)
                     if (
                         (
                             len(ret) == len(co_route["stops"])
