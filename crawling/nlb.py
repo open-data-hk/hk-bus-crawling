@@ -49,6 +49,9 @@ def get_route_obj(co: str, route: dict, route_stops: list[dict]) -> ProviderRout
     stop_ids = [stop["stopId"] for stop in route_stops]
     fares = [stop["fare"] for stop in route_stops]
     fares_holiday = [stop["fareHoliday"] for stop in route_stops]
+    some_departure_observe_only = [
+        stop["someDepartureObserveOnly"] for stop in route_stops
+    ]
 
     return {
         "id": route["routeId"],
@@ -66,6 +69,7 @@ def get_route_obj(co: str, route: dict, route_stops: list[dict]) -> ProviderRout
         "stops": stop_ids,
         "fares": fares[0:-1],
         "faresHoliday": fares_holiday[0:-1],
+        "someDepartureObserveOnly": some_departure_observe_only[0:-1],
         "co": co,
     }
 

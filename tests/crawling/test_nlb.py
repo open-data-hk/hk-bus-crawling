@@ -16,11 +16,13 @@ def test_get_route_obj():
             "stopId": "221",
             "fare": "12.7",
             "fareHoliday": "21.4",
+            "someDepartureObserveOnly": 1,
         },
         {
             "stopId": "305",
             "fare": "0.0",
             "fareHoliday": "0.0",
+            "someDepartureObserveOnly": 0,
         },
     ]
 
@@ -38,6 +40,7 @@ def test_get_route_obj():
         "stops": ["221", "305"],
         "fares": ["12.7"],
         "faresHoliday": ["21.4"],
+        "someDepartureObserveOnly": [1],
         "co": "nlb",
     }
 
