@@ -3,6 +3,7 @@ import io
 import json
 from sys import stderr
 
+from gtfs_fare import fare_list_to_csv
 from haversine import Unit, haversine
 from utils import DATA_DIR
 
@@ -52,6 +53,12 @@ def getRouteObj(
     stops_and_alignment=None,
     serviceType=1,
 ):
+    is_nlb = co == "nlb" or (isinstance(co, list) and co == ["nlb"])
+    if is_nlb and isinstance(fares, list):
+        fares = fare_list_to_csv(fares)
+    if is_nlb and isinstance(faresHoliday, list):
+        faresHoliday = fare_list_to_csv(faresHoliday)
+
     route_obj = {
         "route": route,
         "co": co,

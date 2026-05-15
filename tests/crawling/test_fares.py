@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+from crawling.gtfs_fare import parse_fare_csv
+
 SNAPSHOT = Path("tests/snapshots/routeFareList.min.json")
 DATA = Path("data/routeFareList.min.json")
 
@@ -20,12 +22,19 @@ def load_files():
 
 
 def normalize(fares_dict):
-    def _norm(lst):
-        return (
-            [float(x) if x is not None else None for x in lst]
-            if lst is not None
-            else None
-        )
+    def _norm(fares):
+        if fares is None:
+            return None
+        if isinstance(fares, str):
+            sections, groups = parse_fare_csv(fares)
+            if len(sections) == 1:
+                return [
+                    prices[0]
+                    for on_from, on_to, prices in groups
+                    for _ in range(on_from, on_to + 1)
+                ]
+            return fares
+        return [float(x) if x is not None else None for x in fares]
 
     return {
         "fares": _norm(fares_dict["fares"]),
