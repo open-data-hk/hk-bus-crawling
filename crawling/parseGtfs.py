@@ -210,7 +210,7 @@ async def parseGtfs():
         for row in csv.DictReader(csvfile):
             route_id = row["route_id"]
             routeList[route_id] = {
-                "co": row["agency_id"].replace("LWB", "KMB").lower().split("+"),
+                "co": row["agency_id"].lower().split("+"),
                 "route": route_no(row["route_short_name"], route_id, langs[0]),
                 "stops": {},
                 "fares": {},
@@ -335,7 +335,7 @@ async def parseGtfs():
                             )
 
                     for co_code, stop_name in zip(companies, stop_names, strict=True):
-                        co_code = co_code.lower().replace("lwb", "kmb")
+                        co_code = co_code.lower()
                         ret[co_code] = stop_name
 
         return ret
