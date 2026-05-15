@@ -15,19 +15,22 @@ def _time_to_min(t: str) -> int:
     return int(t[:2]) * 60 + int(t[2:4])
 
 
-def countBus(freq):
+def count_services(freq: dict[str, str] | None) -> int:
+    """
+    Calculate total number of service with provided freq dict (value is compressed freq string)
+    """
     if freq is None:
         return 0
     total = 0
-    for s in freq.values():
-        tokens = s.split("|")
-        for i, token in enumerate(tokens):
+    for freq_str in freq.values():
+        start_freq_str = freq_str.split("|")
+        for i, token in enumerate(start_freq_str):
             if "," in token:
-                start, headway = token.split(",")
-                if i + 1 < len(tokens):
-                    end = tokens[i + 1].split(",")[0]
-                    total += (_time_to_min(end) - _time_to_min(start)) / int(headway)
-            elif i == 0 or "," not in tokens[i - 1]:
+                start, freq_mins = token.split(",")
+                if i + 1 < len(start_freq_str):
+                    end = start_freq_str[i + 1].split(",")[0]
+                    total += (_time_to_min(end) - _time_to_min(start)) / int(freq_mins)
+            elif i == 0 or "," not in start_freq_str[i - 1]:
                 total += 1
     return total
 
@@ -52,7 +55,7 @@ def cleansing(co):
             ):
                 if "freq" not in route_j:
                     continue
-                bus = countBus(route_j["freq"])
+                bus = count_services(route_j["freq"])
                 if bus > maxBus:
                     bestIdx = j
                     maxBus = bus
