@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 import logging
 import math
@@ -232,6 +234,21 @@ def get_operator_route_provider(route_key: str) -> str:
     return route_key.split("|", 1)[0]
 
 
+def get_operator_route_stops(operator_route: dict, co: str) -> list[str]:
+    if "stops" in operator_route:
+        return operator_route["stops"]
+
+    stop_alignment = operator_route.get("stop_alignment")
+    if not isinstance(stop_alignment, str):
+        raise KeyError("operator route has neither stops nor stop_alignment")
+
+    return [
+        row[co]
+        for row in csv.DictReader(io.StringIO(stop_alignment))
+        if row.get(co) not in (None, "", "/")
+    ]
+
+
 def get_route_stops(
     route_list_entry: RouteListEntry, operator_routes: OperatorRoutes
 ) -> dict[str, list[str]]:
@@ -242,7 +259,7 @@ def get_route_stops(
     for operator_route_key in route_list_entry.get("operator_routes", []):
         operator_route = operator_routes[operator_route_key]
         co = get_operator_route_provider(operator_route_key)
-        route_stops[co] = operator_route["stops"]
+        route_stops[co] = get_operator_route_stops(operator_route, co)
     return route_stops
 
 

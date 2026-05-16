@@ -624,6 +624,7 @@ def compressOperatorRouteStopAlignments(operator_routes):
         route["stop_alignment"] = compressStopAlignment(
             {co: route["stop_alignment"]}, [co]
         )
+        route.pop("stops", None)
 
 
 def standardizeDict(d):
