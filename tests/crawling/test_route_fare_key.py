@@ -70,3 +70,75 @@ def test_build_route_fare_dict_stores_route_key_inside_route():
 
     assert route_fare_dict == {route_key: route}
     assert route["route_key"] == route_key
+
+
+def test_build_route_fare_dict_uses_operator_route_key(monkeypatch):
+    class CustomOperator:
+        @classmethod
+        def route_key(cls, route):
+            return f"custom|{route['route']}|{route['bound']}"
+
+    monkeypatch.setattr(
+        "crawling.route_fare_key.get_operator_class",
+        lambda operator_code: CustomOperator if operator_code == "custom" else None,
+    )
+    route = {
+        "co": ["custom"],
+        "route": "1",
+        "bound": "O",
+    }
+
+    route_fare_dict = build_route_fare_dict([route], source="custom")
+
+    assert route_fare_dict == {"custom|1|O": route}
+    assert route["route_key"] == "custom|1|O"
+
+
+def test_build_route_fare_dict_uses_kmb_route_key():
+    route = {
+        "co": ["kmb"],
+        "route": "1",
+        "bound": "O",
+        "service_type": "1",
+        "orig_en": "Star Ferry",
+        "dest_en": "Chuk Yuen Estate",
+        "stops": ["A", "B", "C"],
+    }
+
+    route_fare_dict = build_route_fare_dict([route], source="kmb")
+    route_key = "kmb|1|O|1"
+
+    assert route_fare_dict == {route_key: route}
+    assert route["route_key"] == route_key
+
+
+def test_build_route_fare_dict_falls_back_when_operator_route_key_collides():
+    first_route = {
+        "co": ["kmb"],
+        "route": "84M",
+        "bound": "O",
+        "service_type": "1",
+        "orig_en": "First Origin",
+        "dest_en": "First Dest",
+        "stops": ["A", "B", "C"],
+    }
+    second_route = {
+        "co": ["kmb"],
+        "route": "84M",
+        "bound": "O",
+        "service_type": "1",
+        "orig_en": "Second Origin",
+        "dest_en": "Second Dest",
+        "stops": ["D", "E", "F"],
+    }
+
+    route_fare_dict = build_route_fare_dict([first_route, second_route], source="kmb")
+    first_route_key = "kmb|84M|O|1"
+    second_route_key = "kmb|84M|O|1|Second Origin|Second Dest|D|F|3||"
+
+    assert route_fare_dict == {
+        first_route_key: first_route,
+        second_route_key: second_route,
+    }
+    assert first_route["route_key"] == first_route_key
+    assert second_route["route_key"] == second_route_key
