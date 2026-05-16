@@ -120,25 +120,6 @@ jobs:
           # poetry run python ./crawling/routeCompare.py
           poetry run python ./crawling/mtrExits.py
 
-      - name: Upload GMB raw data to S3
-        run: |
-          aws s3 cp data/gmb.raw.routeNoList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeNoList.json
-          aws s3 cp data/gmb.raw.routeList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeList.json
-          aws s3 cp data/gmb.raw.routeStopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeStopList.json
-          aws s3 cp data/gmb.raw.stopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.stopList.json
-
-      - name: Upload CTB raw data to S3
-        run: |
-          aws s3 cp data/ctb.raw.routeList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.routeList.json
-          aws s3 cp data/ctb.raw.routeStopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.routeStopList.json
-          aws s3 cp data/ctb.raw.stopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.stopList.json
-
-      - name: Upload NLB raw data to S3
-        run: |
-          aws s3 cp data/nlb.raw.routeList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/nlb/nlb.raw.routeList.json
-          aws s3 cp data/nlb.raw.routeStopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/nlb/nlb.raw.routeStopList.json
-          aws s3 cp data/nlb.raw.stopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/nlb/nlb.raw.stopList.json
-
       - name: Upload integrated data to S3
         run: |
           aws s3 cp data/holidays.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/holidays.json
