@@ -3,8 +3,8 @@ from pathlib import Path
 
 from crawling.gtfs_fare import parse_fare_csv
 
-SNAPSHOT = Path("tests/snapshots/integrated_routes.json")
-DATA = Path("data/integrated_routes.json")
+SNAPSHOT = Path("tests/snapshots/operators_routes.json")
+DATA = Path("data/operators_routes.json")
 
 
 def load_files():

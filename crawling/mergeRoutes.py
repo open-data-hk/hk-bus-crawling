@@ -659,7 +659,9 @@ def main():
 
     serviceDayMap = loadJson(DATA_DIR / "gtfs.json")["serviceDayMap"]
 
-    integrated_routes = standardizeDict(buildRouteListDict(routeList))
+    integrated_routes = standardizeDict(
+        removeOperatorRouteDerivedInfo(buildRouteListDict(routeList))
+    )
     service_days = standardizeDict(serviceDayMap)
     operator_stops = standardizeDict(stopList)
 

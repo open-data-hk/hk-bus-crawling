@@ -2,6 +2,8 @@
 # Check route latest update time
 
 import asyncio
+import csv
+import io
 import json
 import logging
 import os
@@ -19,10 +21,37 @@ def load_split_db(data_dir):
         route_list = json.load(f)
     with open(data_dir / "operators_stops.json", encoding="UTF-8") as f:
         stop_list = json.load(f)
+    with open(data_dir / "operators_routes.json", encoding="UTF-8") as f:
+        operator_routes = json.load(f)
     return {
         "routeList": route_list,
         "stopList": stop_list,
+        "operatorRoutes": operator_routes,
     }
+
+
+def get_route_operator_stops(db, route):
+    if "stops" in route:
+        return route["stops"].values()
+
+    operator_stops = []
+    for route_key in route.get("operator_routes", []):
+        operator_route = db["operatorRoutes"][route_key]
+        if "stops" in operator_route:
+            operator_stops.append(operator_route["stops"])
+            continue
+
+        co = route_key.split("|", 1)[0]
+        stop_alignment = operator_route.get("stop_alignment")
+        if isinstance(stop_alignment, str):
+            operator_stops.append(
+                [
+                    row[co]
+                    for row in csv.DictReader(io.StringIO(stop_alignment))
+                    if row.get(co) not in (None, "", "/")
+                ]
+            )
+    return operator_stops
 
 
 async def routeCompare():
@@ -33,6 +62,9 @@ async def routeCompare():
         ).json(),
         "stopList": (
             await emitRequest("https://data.hkbus.app/operators_stops.json", a_client)
+        ).json(),
+        "operatorRoutes": (
+            await emitRequest("https://data.hkbus.app/operators_routes.json", a_client)
         ).json(),
     }
     newDb = load_split_db(DATA_DIR)
@@ -55,8 +87,10 @@ async def routeCompare():
 
     for newKey in newDb["routeList"]:
         busStopsinRoute = set()
-        for provider in newDb["routeList"][newKey]["stops"]:
-            busStopsinRoute.update(newDb["routeList"][newKey]["stops"][provider])
+        for operator_stops in get_route_operator_stops(
+            newDb, newDb["routeList"][newKey]
+        ):
+            busStopsinRoute.update(operator_stops)
         if (
             newKey not in oldDb["routeList"]
             or bool(changedStops & busStopsinRoute)

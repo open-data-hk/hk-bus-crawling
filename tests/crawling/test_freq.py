@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-SNAPSHOT = Path("tests/snapshots/integrated_routes.json")
-DATA = Path("data/integrated_routes.json")
+SNAPSHOT = Path("tests/snapshots/operators_routes.json")
+DATA = Path("data/operators_routes.json")
 
 
 def compress_freq_entries(entries: dict) -> str:
