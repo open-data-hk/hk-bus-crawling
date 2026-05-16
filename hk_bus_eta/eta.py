@@ -37,7 +37,7 @@ class HKEta:
     operator_routes = None
 
     def __init__(self):
-        base_url = "https://hkbus.github.io/hk-bus-crawling"
+        base_url = "https://open-data-hk.github.io/hk-bus-crawling"
         (
             self.holidays,
             self.route_list,

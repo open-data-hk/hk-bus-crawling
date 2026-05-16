@@ -47,7 +47,7 @@ print( route_ids )
 ## Data Crawling by yourself
 
 ### Usage
-Daily fetched JSON is in [gh-pages](https://github.com/hkbus/hk-bus-crawling/tree/gh-pages), including [integrated_routes.json](https://hkbus.github.io/hk-bus-crawling/integrated_routes.json), [operators_stops.json](https://hkbus.github.io/hk-bus-crawling/operators_stops.json), [nearby_operators_stops.json](https://hkbus.github.io/hk-bus-crawling/nearby_operators_stops.json), [service_days.json](https://hkbus.github.io/hk-bus-crawling/service_days.json), and [holidays.json](https://hkbus.github.io/hk-bus-crawling/holidays.json).
+Daily fetched JSON is in [gh-pages](https://github.com/open-data-hk/hk-bus-crawling/tree/gh-pages), including [integrated_routes.json](https://open-data-hk.github.io/hk-bus-crawling/integrated_routes.json), [operators_stops.json](https://open-data-hk.github.io/hk-bus-crawling/operators_stops.json), [nearby_operators_stops.json](https://open-data-hk.github.io/hk-bus-crawling/nearby_operators_stops.json), [service_days.json](https://open-data-hk.github.io/hk-bus-crawling/service_days.json), and [holidays.json](https://open-data-hk.github.io/hk-bus-crawling/holidays.json).
 
 ### Installation
 
