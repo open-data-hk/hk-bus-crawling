@@ -12,6 +12,7 @@ on:
 
 jobs:
   Fetch-Route-Data:
+    if: ${{ github.event_name != 'pull_request' || github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     permissions:
       actions: write
