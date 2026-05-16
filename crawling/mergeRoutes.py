@@ -637,7 +637,7 @@ def main():
         route["stops"] = {co: stops for co, stops in route["stops"]}
     gtfsStopMap = buildGtfsStopMap(routeList)
     writeJson(
-        DATA_DIR / "gtfsOperatorsStopsMap.json",
+        DATA_DIR / "gtfs_operators_stops_map.json",
         standardizeDict(gtfsStopMap),
         separators=(",", ":"),
     )
