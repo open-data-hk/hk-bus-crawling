@@ -123,6 +123,14 @@ def mergeOperatorRoutes(route, found_route):
             operator_routes.append(route_key)
 
 
+def addOperatorRoutes(co_route_dict, operator_route_dict):
+    for co_route in co_route_dict.values():
+        route_key = co_route["route_key"]
+        if route_key in operator_route_dict:
+            raise ValueError(f"Duplicate operator route key: {route_key}")
+        operator_route_dict[route_key] = co_route
+
+
 def isGtfsMatch(whole_route, co_route):
     if whole_route.get("gtfs_route_id") is None:
         return True
@@ -295,8 +303,10 @@ def importUnmatchedGtfsRoutes(whole_route_list, whole_stop_list):
             whole_route_list.append(route_obj)
 
 
-def importRouteListJson(co, whole_route_list, whole_stop_list):
+def importRouteListJson(co, whole_route_list, whole_stop_list, operator_route_dict):
     co_route_dict = loadJson(DATA_DIR / f"routeFareList.{co}.cleansed.json")
+    addOperatorRoutes(co_route_dict, operator_route_dict)
+
     co_stop_list = loadJson(DATA_DIR / f"stopList.{co}.json")
     for co_stop_id, co_stop in co_stop_list.items():
         if co_stop_id not in whole_stop_list:
@@ -592,8 +602,9 @@ def standardizeDict(d):
 def main():
     global routeList
 
+    operator_routes = {}
     for co in PROVIDERS:
-        importRouteListJson(co, routeList, stopList)
+        importRouteListJson(co, routeList, stopList, operator_routes)
     importUnmatchedGtfsRoutes(routeList, stopList)
 
     routeList = smartUnique(routeList)
@@ -603,6 +614,11 @@ def main():
     writeJson(
         DATA_DIR / "gtfsOperatorsStopsMap.json",
         standardizeDict(gtfsStopMap),
+        separators=(",", ":"),
+    )
+    writeJson(
+        DATA_DIR / "operators_routes.json",
+        standardizeDict(operator_routes),
         separators=(",", ":"),
     )
     # TODO: low priority, align sequence of all operators and GTFS together, currently they are aligned separately
