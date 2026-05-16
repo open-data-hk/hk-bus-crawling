@@ -117,7 +117,7 @@ jobs:
           poetry run python ./crawling/cleansing.py
           poetry run python ./crawling/mergeRoutes.py
           poetry run python ./crawling/mergeStopList.py
-          # poetry run python ./crawling/routeCompare.py
+          poetry run python ./crawling/routeCompare.py
           poetry run python ./crawling/mtrExits.py
 
       - name: Upload integrated data to S3

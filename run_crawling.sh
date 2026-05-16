@@ -24,5 +24,5 @@ python ./crawling/mergeRoutes.py
 
 # for consistency in GitHub Actions
 python ./crawling/mergeStopList.py
-# python ./crawling/routeCompare.py
+python ./crawling/routeCompare.py
 python ./crawling/mtrExits.py
