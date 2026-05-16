@@ -38,5 +38,5 @@ def test_identical_files():
             "lat": round(snapshot["lat"], dp),
             "long": round(snapshot["long"], dp),
         }
-    for idx, fare in enumerate(fare_list_data):
-        assert fare == fare_list_snapshot[idx]
+    for route_key, fare in fare_list_data.items():
+        assert fare == fare_list_snapshot[route_key]
