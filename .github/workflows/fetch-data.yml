@@ -90,6 +90,7 @@ jobs:
           aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/transport/nlb/nlb.raw.stopList.json data/ || true
 
       - name: Crawling resources
+        timeout-minutes: 5
         shell: bash
         env:
           REQUEST_LIMIT: "6"
