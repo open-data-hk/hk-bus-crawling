@@ -17,7 +17,7 @@ Scripts must run after their listed inputs exist. Layers describe the earliest p
 
 | Script | Reads | Output files |
 |--------|-------|-------------|
-| `parseHoliday.py` | - | `holiday.json` |
+| `parseHoliday.py` | - | `holidays.json` |
 | `ctb_crawl.py` | - | `ctb.raw.routeList.json`, `ctb.raw.routeStopList.json`, `ctb.raw.stopList.json` |
 | `ctb.py` | `ctb.raw.routeList.json`, `ctb.raw.routeStopList.json`, `ctb.raw.stopList.json` | `routeList.ctb.json`, `stopList.ctb.json` |
 | `kmb_crawl.py` | - | `kmb.raw.routeList.json`, `kmb.raw.routeStopList.json`, `kmb.raw.stopList.json` |
