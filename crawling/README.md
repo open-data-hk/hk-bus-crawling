@@ -57,7 +57,7 @@ These can run once Layer 1 completes and any listed raw files from Layer 2 exist
 
 | Script | Reads | Output files |
 |--------|-------|-------------|
-| `mergeRoutes.py` | `routeFareList.{co}.cleansed.json`, `stopList.{co}.json`, `holiday.json`, `gtfs.json` | `routeFareList.mergeRoutes.min.json` |
+| `mergeRoutes.py` | `routeFareList.{co}.cleansed.json`, `stopList.{co}.json`, `holiday.json`, `gtfs.json` | `routeFareList.mergeRoutes.min.json`, `operators_routes.json` |
 
 ### Layer 7 — Needs `routeFareList.mergeRoutes.min.json`
 

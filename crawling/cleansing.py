@@ -1,6 +1,9 @@
 import json
 
+from route_fare_key import build_route_fare_dict
 from utils import DATA_DIR
+
+EXPORTED_CLEANSED_ROUTE_FARE_KEYS: dict[str, str] = {}
 
 
 def is_name_match(name_a: str, name_b: str) -> bool:
@@ -37,7 +40,8 @@ def count_services(freq: dict[str, str] | None) -> int:
 
 def cleansing(co):
     with open(DATA_DIR / ("routeFareList.%s.json" % co), "r", encoding="UTF-8") as f:
-        routeList = json.load(f)
+        route_dict = json.load(f)
+    routeList = list(route_dict.values())
 
     for i, route_i in enumerate(routeList):
         route_i["co"] = [co for co in route_i["co"] if co != "ferry"]
@@ -72,13 +76,18 @@ def cleansing(co):
             ):
                 route_i["skip"] = True
 
-    _routeList = [route for route in routeList if "skip" not in route]
-    print(co, len(routeList), len(_routeList))
+    cleansed_route_list = [route for route in routeList if "skip" not in route]
+    cleansed_route_dict = build_route_fare_dict(
+        cleansed_route_list,
+        exported_route_keys=EXPORTED_CLEANSED_ROUTE_FARE_KEYS,
+        source=co,
+    )
+    print(co, len(route_dict), len(cleansed_route_dict))
 
     with open(
         DATA_DIR / ("routeFareList.%s.cleansed.json" % co), "w", encoding="UTF-8"
     ) as f:
-        f.write(json.dumps(_routeList, ensure_ascii=False))
+        f.write(json.dumps(cleansed_route_dict, ensure_ascii=False))
 
 
 cleansing("kmb")

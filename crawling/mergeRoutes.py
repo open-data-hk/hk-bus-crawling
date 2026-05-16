@@ -25,6 +25,22 @@ PROVIDERS = [
     "hkkf",
 ]
 GTFS_STOP_PREFIX = "gtfs"
+OPERATOR_ROUTE_DERIVED_KEYS = (
+    "bound",
+    "co",
+    "circular_return_point",
+    "circular_sections",
+    "dest",
+    "fares",
+    "faresHoliday",
+    "freq",
+    "jt",
+    "nlbId",
+    "orig",
+    "seq",
+    "serviceType",
+    "stops",
+)
 
 
 def loadJson(path):
@@ -107,6 +123,28 @@ def addCircularMetadataToRoute(route, co, co_route):
         ]
     if "circular_sections" in co_route:
         route.setdefault("circular_sections", {})[co] = co_route["circular_sections"]
+
+
+def addOperatorRouteToRoute(route, co_route):
+    route_key = co_route["route_key"]
+    operator_routes = route.setdefault("operator_routes", [])
+    if route_key not in operator_routes:
+        operator_routes.append(route_key)
+
+
+def mergeOperatorRoutes(route, found_route):
+    for route_key in found_route.get("operator_routes", []):
+        operator_routes = route.setdefault("operator_routes", [])
+        if route_key not in operator_routes:
+            operator_routes.append(route_key)
+
+
+def addOperatorRoutes(co_route_dict, operator_route_dict):
+    for co_route in co_route_dict.values():
+        route_key = co_route["route_key"]
+        if route_key in operator_route_dict:
+            raise ValueError(f"Duplicate operator route key: {route_key}")
+        operator_route_dict[route_key] = co_route
 
 
 def isGtfsMatch(whole_route, co_route):
@@ -281,8 +319,10 @@ def importUnmatchedGtfsRoutes(whole_route_list, whole_stop_list):
             whole_route_list.append(route_obj)
 
 
-def importRouteListJson(co, whole_route_list, whole_stop_list):
-    co_route_list = loadJson(DATA_DIR / f"routeFareList.{co}.cleansed.json")
+def importRouteListJson(co, whole_route_list, whole_stop_list, operator_route_dict):
+    co_route_dict = loadJson(DATA_DIR / f"routeFareList.{co}.cleansed.json")
+    addOperatorRoutes(co_route_dict, operator_route_dict)
+
     co_stop_list = loadJson(DATA_DIR / f"stopList.{co}.json")
     for co_stop_id, co_stop in co_stop_list.items():
         if co_stop_id not in whole_stop_list:
@@ -291,7 +331,7 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
             except BaseException:
                 print("Problematic stop: ", co_stop_id, file=stderr)
 
-    for co_route in co_route_list:
+    for co_route in co_route_dict.values():
         found = False
         special_type = 1
         orig = getRouteNameObj(co_route, "orig")
@@ -309,6 +349,7 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
                 w_route["bound"][co] = co_route["bound"]
                 addStopAlignmentToRoute(w_route, co, co_route)
                 addCircularMetadataToRoute(w_route, co, co_route)
+                addOperatorRouteToRoute(w_route, co_route)
             elif isOrigDestSameEnName(co_route, w_route):
                 special_type = int(w_route["serviceType"]) + 1
                 if co_route["route"] == "606" and co_route["dest_tc"].startswith(
@@ -340,6 +381,7 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
                 seq=len(co_route["stops"]),
             )
             addCircularMetadataToRoute(route_obj, co, co_route)
+            addOperatorRouteToRoute(route_obj, co_route)
             whole_route_list.append(route_obj)
 
 
@@ -359,6 +401,26 @@ def getRouteId(v):
         v["orig"]["en"],
         v["dest"]["en"],
     )
+
+
+def buildRouteListDict(route_list):
+    route_list_dict = {}
+    for route in route_list:
+        route_id = getRouteId(route)
+        if route_id in route_list_dict:
+            mergeOperatorRoutes(route_list_dict[route_id], route)
+        else:
+            route_list_dict[route_id] = route
+    return route_list_dict
+
+
+def removeOperatorRouteDerivedInfo(route_list_dict):
+    for route in route_list_dict.values():
+        if "operator_routes" not in route:
+            continue
+        for key in OPERATOR_ROUTE_DERIVED_KEYS:
+            route.pop(key, None)
+    return route_list_dict
 
 
 def get_operator_stop_key(co, stop):
@@ -480,6 +542,7 @@ def smartUnique(route_list):
                 route_i.setdefault("circular_sections", {}).update(
                     route_list[found]["circular_sections"]
                 )
+            mergeOperatorRoutes(route_i, route_list[found])
             route_list[found]["skip"] = True
 
         # append return array
@@ -564,8 +627,9 @@ def standardizeDict(d):
 def main():
     global routeList
 
+    operator_routes = {}
     for co in PROVIDERS:
-        importRouteListJson(co, routeList, stopList)
+        importRouteListJson(co, routeList, stopList, operator_routes)
     importUnmatchedGtfsRoutes(routeList, stopList)
 
     routeList = smartUnique(routeList)
@@ -575,6 +639,11 @@ def main():
     writeJson(
         DATA_DIR / "gtfsOperatorsStopsMap.json",
         standardizeDict(gtfsStopMap),
+        separators=(",", ":"),
+    )
+    writeJson(
+        DATA_DIR / "operators_routes.json",
+        standardizeDict(operator_routes),
         separators=(",", ":"),
     )
     # TODO: low priority, align sequence of all operators and GTFS together, currently they are aligned separately
@@ -587,7 +656,7 @@ def main():
 
     db = standardizeDict(
         {
-            "routeList": {getRouteId(v): v for v in routeList},
+            "routeList": removeOperatorRouteDerivedInfo(buildRouteListDict(routeList)),
             "stopList": stopList,
             # TODO: simply set it is empty dict
             "stopMap": stopMap,

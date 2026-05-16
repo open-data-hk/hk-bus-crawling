@@ -20,6 +20,7 @@ class Stop(TypedDict):
 
 class RouteListEntry(TypedDict, total=False):
     stops: dict[str, list[str]]
+    operator_routes: list[str]
 
 
 class RouteStop(TypedDict):
@@ -49,6 +50,7 @@ type StopGroup = list[list[str]]
 type StopGroupStr = str
 type DistanceCache = dict[tuple[str, str], float]
 type BearingRange = tuple[float, float]
+type OperatorRoutes = dict[str, dict]
 
 
 def get_stops_haversine_distance(stop_a: Stop, stop_b: Stop) -> float:
@@ -226,6 +228,24 @@ def get_stop_group_str(
     return "||".join(sorted(group_members))
 
 
+def get_operator_route_provider(route_key: str) -> str:
+    return route_key.split("|", 1)[0]
+
+
+def get_route_stops(
+    route_list_entry: RouteListEntry, operator_routes: OperatorRoutes
+) -> dict[str, list[str]]:
+    if "stops" in route_list_entry:
+        return route_list_entry["stops"]
+
+    route_stops = {}
+    for operator_route_key in route_list_entry.get("operator_routes", []):
+        operator_route = operator_routes[operator_route_key]
+        co = get_operator_route_provider(operator_route_key)
+        route_stops[co] = operator_route["stops"]
+    return route_stops
+
+
 # Main function to process stops
 
 
@@ -238,12 +258,15 @@ def merge_stop_list() -> None:
 
     route_list = cast(RouteList, db["routeList"])
     stop_list = cast(StopList, db["stopList"])
+    with open(DATA_DIR / "operators_routes.json", "r", encoding="UTF-8") as f:
+        operator_routes = cast(OperatorRoutes, json.load(f))
+
     start_time = time.time()
     stop_seq_mapping: StopSeqMapping = {}
 
     # Preprocess the list of bearings for each stop
     for route_key, route_list_entry in route_list.items():
-        stops = route_list_entry.get("stops", {})
+        stops = get_route_stops(route_list_entry, operator_routes)
         for co, co_stops in stops.items():
             for stop_pos, stop_id in enumerate(co_stops):
                 if stop_id not in stop_seq_mapping:
