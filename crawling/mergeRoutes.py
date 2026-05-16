@@ -617,6 +617,20 @@ def compressRouteStopAlignments(route_list):
             )
 
 
+def get_operator_route_provider(route_key):
+    return route_key.split("|", 1)[0]
+
+
+def compressOperatorRouteStopAlignments(operator_routes):
+    for route_key, route in operator_routes.items():
+        if "stop_alignment" not in route:
+            continue
+        co = get_operator_route_provider(route_key)
+        route["stop_alignment"] = compressStopAlignment(
+            {co: route["stop_alignment"]}, [co]
+        )
+
+
 def standardizeDict(d):
     return {
         key: value if not isinstance(value, dict) else standardizeDict(value)
@@ -641,15 +655,11 @@ def main():
         standardizeDict(gtfsStopMap),
         separators=(",", ":"),
     )
-    writeJson(
-        DATA_DIR / "operators_routes.json",
-        standardizeDict(operator_routes),
-        separators=(",", ":"),
-    )
     # TODO: low priority, align sequence of all operators and GTFS together, currently they are aligned separately
     # extra stop from one operator will append row individually
     # if 3 operators have the same extra stop, their will be 3 rows appended
     compressRouteStopAlignments(routeList)
+    compressOperatorRouteStopAlignments(operator_routes)
 
     serviceDayMap = loadJson(DATA_DIR / "gtfs.json")["serviceDayMap"]
 
@@ -660,6 +670,11 @@ def main():
     writeJson(
         DATA_DIR / "integrated_routes.json",
         integrated_routes,
+        separators=(",", ":"),
+    )
+    writeJson(
+        DATA_DIR / "operators_routes.json",
+        standardizeDict(operator_routes),
         separators=(",", ":"),
     )
     writeJson(
