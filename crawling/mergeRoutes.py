@@ -25,6 +25,22 @@ PROVIDERS = [
     "hkkf",
 ]
 GTFS_STOP_PREFIX = "gtfs"
+OPERATOR_ROUTE_DERIVED_KEYS = (
+    "bound",
+    "co",
+    "circular_return_point",
+    "circular_sections",
+    "dest",
+    "fares",
+    "faresHoliday",
+    "freq",
+    "jt",
+    "nlbId",
+    "orig",
+    "seq",
+    "serviceType",
+    "stops",
+)
 
 
 def loadJson(path):
@@ -398,6 +414,15 @@ def buildRouteListDict(route_list):
     return route_list_dict
 
 
+def removeOperatorRouteDerivedInfo(route_list_dict):
+    for route in route_list_dict.values():
+        if "operator_routes" not in route:
+            continue
+        for key in OPERATOR_ROUTE_DERIVED_KEYS:
+            route.pop(key, None)
+    return route_list_dict
+
+
 def get_operator_stop_key(co, stop):
     return f"{co}:{stop}"
 
@@ -631,7 +656,7 @@ def main():
 
     db = standardizeDict(
         {
-            "routeList": buildRouteListDict(routeList),
+            "routeList": removeOperatorRouteDerivedInfo(buildRouteListDict(routeList)),
             "stopList": stopList,
             # TODO: simply set it is empty dict
             "stopMap": stopMap,
