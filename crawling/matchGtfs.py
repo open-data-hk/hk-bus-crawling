@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Literal, TypedDict
 
 from haversine import haversine
+from route_fare_key import build_route_fare_dict
 from utils import DATA_DIR
 
 INFINITY_DIST = 1000000
@@ -153,6 +154,7 @@ def load_unmatched_co_route_exemptions() -> dict[str, set[str] | None]:
 
 UNMATCHED_CO_ROUTE_EXEMPTIONS = load_unmatched_co_route_exemptions()
 UNMATCHED_OPERATOR_ROUTES_BY_GTFS_KEY: dict[RouteMatchKey, list[tuple[str, Route]]] = {}
+EXPORTED_ROUTE_FARE_KEYS: dict[str, str] = {}
 
 # Routes that are known to exist in GTFS but not in an operator feed.
 UNMATCHED_GTFS_ROUTE_EXEMPTIONS: dict[str, set[str] | None] = {}
@@ -888,8 +890,9 @@ def match_co_routes_with_gtfs(co: str) -> None:
        against all candidate operator routes (including virtual circular ones).
     3. Attaches ``fares``, ``freq`` (service frequency), ``jt`` (journey time),
        and the aligned ``stops`` subset to the best-matching operator route.
-    4. Writes a ``routeFareList.{co}.json`` with every route (matched or not),
-       filtering out routes that were only partially matched and carry no fare.
+    4. Writes a keyed ``routeFareList.{co}.json`` with every route (matched or
+       not), filtering out routes that were only partially matched and carry no
+       fare.
 
     Special handling:
 
@@ -909,7 +912,9 @@ def match_co_routes_with_gtfs(co: str) -> None:
     Side effects:
         - Reads ``DATA_DIR/routeList.{co}.json`` and
           ``DATA_DIR/stopList.{co}.json``.
-        - Writes ``DATA_DIR/routeFareList.{co}.json``.
+        - Writes ``DATA_DIR/routeFareList.{co}.json`` keyed by
+          ``co|route|bound|service_type|orig_en|dest_en|first_stop|last_stop|``
+          ``stop_count|gtfs_route_id|gtfs_route_seq``.
         - Mutates the module-level ``gtfsRoutes`` dict by adding a ``_route``
           key to successfully matched entries (consumed later when writing
           ``routeGtfs.all.json``).
@@ -1165,8 +1170,14 @@ def match_co_routes_with_gtfs(co: str) -> None:
         and ("found" not in route or "fares" in route)
     ]
 
+    route_fare_dict = build_route_fare_dict(
+        co_routes,
+        exported_route_keys=EXPORTED_ROUTE_FARE_KEYS,
+        source=co,
+    )
+
     with open(DATA_DIR / ("routeFareList.%s.json" % co), "w", encoding="UTF-8") as f:
-        f.write(json.dumps(co_routes, ensure_ascii=False))
+        f.write(json.dumps(route_fare_dict, ensure_ascii=False))
 
 
 match_co_routes_with_gtfs("kmb")

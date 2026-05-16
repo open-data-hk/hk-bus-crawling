@@ -282,7 +282,7 @@ def importUnmatchedGtfsRoutes(whole_route_list, whole_stop_list):
 
 
 def importRouteListJson(co, whole_route_list, whole_stop_list):
-    co_route_list = loadJson(DATA_DIR / f"routeFareList.{co}.cleansed.json")
+    co_route_dict = loadJson(DATA_DIR / f"routeFareList.{co}.cleansed.json")
     co_stop_list = loadJson(DATA_DIR / f"stopList.{co}.json")
     for co_stop_id, co_stop in co_stop_list.items():
         if co_stop_id not in whole_stop_list:
@@ -291,7 +291,7 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
             except BaseException:
                 print("Problematic stop: ", co_stop_id, file=stderr)
 
-    for co_route in co_route_list:
+    for co_route in co_route_dict.values():
         found = False
         special_type = 1
         orig = getRouteNameObj(co_route, "orig")
