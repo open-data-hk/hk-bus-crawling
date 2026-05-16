@@ -14,12 +14,28 @@ from crawl_utils import emitRequest
 from utils import DATA_DIR
 
 
+def load_split_db(data_dir):
+    with open(data_dir / "integrated_routes.json", encoding="UTF-8") as f:
+        route_list = json.load(f)
+    with open(data_dir / "operators_stops.json", encoding="UTF-8") as f:
+        stop_list = json.load(f)
+    return {
+        "routeList": route_list,
+        "stopList": stop_list,
+    }
+
+
 async def routeCompare():
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
-    r = await emitRequest("https://data.hkbus.app/routeFareList.min.json", a_client)
-    r.encoding = "utf-8"
-    oldDb = r.json()
-    newDb = json.load(open(DATA_DIR / "routeFareList.min.json", "r", encoding="UTF-8"))
+    oldDb = {
+        "routeList": (
+            await emitRequest("https://data.hkbus.app/integrated_routes.json", a_client)
+        ).json(),
+        "stopList": (
+            await emitRequest("https://data.hkbus.app/operators_stops.json", a_client)
+        ).json(),
+    }
+    newDb = load_split_db(DATA_DIR)
     changedStops = set()
 
     os.makedirs(DATA_DIR / "route-ts", exist_ok=True)

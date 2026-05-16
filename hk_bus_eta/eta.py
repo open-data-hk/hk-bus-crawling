@@ -9,7 +9,6 @@ __author__ = "Chun Law"
 __email__ = "chunlaw@rocketmail.com"
 __status__ = "production"
 
-import hashlib
 import re
 import time
 from datetime import datetime, timezone
@@ -35,22 +34,12 @@ class HKEta:
     stop_map = None
 
     def __init__(self):
-        md5 = requests.get(
-            "https://hkbus.github.io/hk-bus-crawling/routeFareList.md5"
-        ).text
-        r = requests.get(
-            "https://hkbus.github.io/hk-bus-crawling/routeFareList.min.json"
-        )
-        m = hashlib.md5()
-        m.update(r.text.encode("utf-8"))
-        if md5 != m.hexdigest():
-            raise Exception("Error in accessing hk-eta-db, md5sum not match")
-        db = r.json()
+        base_url = "https://hkbus.github.io/hk-bus-crawling"
         self.holidays, self.route_list, self.stop_list, self.stop_map = (
-            db["holidays"],
-            db["routeList"],
-            db["stopList"],
-            db["stopMap"],
+            requests.get(f"{base_url}/holidays.json").json(),
+            requests.get(f"{base_url}/integrated_routes.json").json(),
+            requests.get(f"{base_url}/operators_stops.json").json(),
+            requests.get(f"{base_url}/nearby_operators_stops.json").json(),
         )
 
     # 0-indexed seq

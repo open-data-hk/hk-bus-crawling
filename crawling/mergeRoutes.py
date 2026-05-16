@@ -651,22 +651,26 @@ def main():
     # if 3 operators have the same extra stop, their will be 3 rows appended
     compressRouteStopAlignments(routeList)
 
-    holidays = loadJson(DATA_DIR / "holiday.json")
     serviceDayMap = loadJson(DATA_DIR / "gtfs.json")["serviceDayMap"]
 
-    db = standardizeDict(
-        {
-            "routeList": removeOperatorRouteDerivedInfo(buildRouteListDict(routeList)),
-            "stopList": stopList,
-            # TODO: simply set it is empty dict
-            "stopMap": stopMap,
-            "holidays": holidays,
-            "serviceDayMap": serviceDayMap,
-        }
-    )
+    integrated_routes = standardizeDict(buildRouteListDict(routeList))
+    service_days = standardizeDict(serviceDayMap)
+    operator_stops = standardizeDict(stopList)
 
     writeJson(
-        DATA_DIR / "routeFareList.mergeRoutes.min.json", db, separators=(",", ":")
+        DATA_DIR / "integrated_routes.json",
+        integrated_routes,
+        separators=(",", ":"),
+    )
+    writeJson(
+        DATA_DIR / "service_days.json",
+        service_days,
+        separators=(",", ":"),
+    )
+    writeJson(
+        DATA_DIR / "operators_stops.json",
+        operator_stops,
+        separators=(",", ":"),
     )
 
 

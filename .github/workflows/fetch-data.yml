@@ -120,11 +120,6 @@ jobs:
           # poetry run python ./crawling/routeCompare.py
           poetry run python ./crawling/mtrExits.py
 
-      - name: Update MD5
-        shell: bash
-        run: |
-          md5sum data/routeFareList.min.json | cut -f1 -d ' ' | tr -d $'\n' > data/routeFareList.md5
-
       - name: Upload GMB raw data to S3
         run: |
           aws s3 cp data/gmb.raw.routeNoList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeNoList.json
@@ -151,7 +146,11 @@ jobs:
           name: Crawled Files
           retention-days: 14
           path: |
-            data/holiday.json
+            data/holidays.json
+            data/integrated_routes.json
+            data/service_days.json
+            data/operators_stops.json
+            data/nearby_operators_stops.json
             data/routeFareList*
             data/routeList*
             data/stopCandidates*
@@ -174,9 +173,11 @@ jobs:
         shell: bash
         run: |
           cp \
-          data/routeFareList.json \
-          data/routeFareList.min.json \
-          data/routeFareList.md5 \
+          data/holidays.json \
+          data/integrated_routes.json \
+          data/service_days.json \
+          data/operators_stops.json \
+          data/nearby_operators_stops.json \
           CNAME \
           data/exits.mtr.json \
           data/gtfsOperatorsStopsMap.json \

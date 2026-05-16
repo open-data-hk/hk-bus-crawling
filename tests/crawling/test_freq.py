@@ -1,12 +1,14 @@
 import json
 from pathlib import Path
 
-SNAPSHOT = Path("tests/snapshots/routeFareList.min.json")
-DATA = Path("data/routeFareList.min.json")
+SNAPSHOT = Path("tests/snapshots/integrated_routes.json")
+DATA = Path("data/integrated_routes.json")
 
 
 def compress_freq_entries(entries: dict) -> str:
     """Mirror of compress_freq_entries in crawling/parseGtfs.py."""
+    if isinstance(entries, str):
+        return entries
     parts = []
     prev_freq_end = None
     for start in sorted(entries.keys()):
@@ -32,17 +34,17 @@ def test_freq_matches_snapshot():
     current = json.loads(DATA.read_text(encoding="UTF-8"))
 
     mismatches = []
-    for route_key, snap_route in snapshot["routeList"].items():
+    for route_key, snap_route in snapshot.items():
         snap_freq = snap_route.get("freq")
         if not snap_freq:
             continue
-        if route_key not in current["routeList"]:
+        if route_key not in current:
             continue
-        cur_freq = current["routeList"][route_key].get("freq", {})
+        cur_freq = current[route_key].get("freq", {})
 
         for calendar, entries in snap_freq.items():
             expected = compress_freq_entries(entries)
-            actual = cur_freq.get(calendar)
+            actual = compress_freq_entries(cur_freq.get(calendar, {}))
             if expected != actual:
                 mismatches.append((route_key, calendar, expected, actual))
 
