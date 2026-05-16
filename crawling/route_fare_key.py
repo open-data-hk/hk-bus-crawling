@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sys
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
@@ -13,6 +14,7 @@ except ModuleNotFoundError:
 
 ROUTE_FARE_KEY_SEPARATOR = "|"
 ROUTE_FARE_KEY_LIST_SEPARATOR = ","
+logger = logging.getLogger(__name__)
 
 
 def _escape_route_key_value(value: str) -> str:
@@ -64,12 +66,29 @@ def get_default_route_unique_key(route: Mapping[str, Any]) -> str:
 def get_route_unique_key(
     route: Mapping[str, Any], operator_code: str | None = None
 ) -> str:
+    operator_route_key = get_operator_route_unique_key(route, operator_code)
+    if operator_route_key:
+        return operator_route_key
+    return get_default_route_unique_key(route)
+
+
+def get_operator_route_unique_key(
+    route: Mapping[str, Any], operator_code: str | None = None
+) -> str | None:
     operator_class = get_operator_class(operator_code)
     if operator_class is not None:
         route_key = operator_class.route_key(route)
         if route_key:
             return route_key
-    return get_default_route_unique_key(route)
+    return None
+
+
+def format_route_for_log(route: Mapping[str, Any]) -> str:
+    return (
+        f"route={route.get('route')} bound={route.get('bound')} "
+        f"service_type={route.get('service_type')} "
+        f"{route.get('orig_en')} -> {route.get('dest_en')}"
+    )
 
 
 def build_route_fare_dict(
@@ -79,12 +98,29 @@ def build_route_fare_dict(
 ) -> dict[str, dict[str, Any]]:
     route_fare_dict: dict[str, dict[str, Any]] = {}
     for route in routes:
-        route_key = get_route_unique_key(route, source)
+        operator_route_key = get_operator_route_unique_key(route, source)
+        route_key = operator_route_key or get_default_route_unique_key(route)
         if route_key in route_fare_dict or (
             exported_route_keys is not None and route_key in exported_route_keys
         ):
             fallback_route_key = get_default_route_unique_key(route)
-            if fallback_route_key != route_key:
+            if operator_route_key is not None and fallback_route_key != route_key:
+                conflict_source = route_fare_dict.get(route_key)
+                if conflict_source is None and exported_route_keys is not None:
+                    conflict_source = exported_route_keys.get(route_key)
+                logger.warning(
+                    "Operator route_key conflict: source=%s key=%s "
+                    "conflict_source=%s fallback_key=%s candidate_route=%s",
+                    source,
+                    route_key,
+                    (
+                        format_route_for_log(conflict_source)
+                        if isinstance(conflict_source, dict)
+                        else conflict_source
+                    ),
+                    fallback_route_key,
+                    format_route_for_log(route),
+                )
                 route_key = fallback_route_key
 
         if route_key in route_fare_dict:

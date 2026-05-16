@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 from crawling.operator import OPERATOR_CLASSES
@@ -113,7 +115,7 @@ def test_build_route_fare_dict_uses_kmb_route_key():
     assert route["route_key"] == route_key
 
 
-def test_build_route_fare_dict_falls_back_when_operator_route_key_collides():
+def test_build_route_fare_dict_falls_back_when_operator_route_key_collides(caplog):
     first_route = {
         "co": ["kmb"],
         "route": "84M",
@@ -133,7 +135,10 @@ def test_build_route_fare_dict_falls_back_when_operator_route_key_collides():
         "stops": ["D", "E", "F"],
     }
 
-    route_fare_dict = build_route_fare_dict([first_route, second_route], source="kmb")
+    with caplog.at_level(logging.WARNING, logger="crawling.route_fare_key"):
+        route_fare_dict = build_route_fare_dict(
+            [first_route, second_route], source="kmb"
+        )
     first_route_key = "kmb|84M|O|1"
     second_route_key = "kmb|84M|O|1|Second Origin|Second Dest|D|F|3||"
 
@@ -143,6 +148,10 @@ def test_build_route_fare_dict_falls_back_when_operator_route_key_collides():
     }
     assert first_route["route_key"] == first_route_key
     assert second_route["route_key"] == second_route_key
+    assert "Operator route_key conflict" in caplog.text
+    assert "source=kmb" in caplog.text
+    assert f"key={first_route_key}" in caplog.text
+    assert f"fallback_key={second_route_key}" in caplog.text
 
 
 def test_all_provider_operator_classes_are_registered():
