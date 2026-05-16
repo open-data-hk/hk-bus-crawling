@@ -32,15 +32,29 @@ class HKEta:
     route_list = None
     stop_list = None
     stop_map = None
+    operator_routes = None
 
     def __init__(self):
         base_url = "https://hkbus.github.io/hk-bus-crawling"
-        self.holidays, self.route_list, self.stop_list, self.stop_map = (
+        (
+            self.holidays,
+            self.route_list,
+            self.stop_list,
+            self.stop_map,
+            self.operator_routes,
+        ) = (
             requests.get(f"{base_url}/holidays.json").json(),
             requests.get(f"{base_url}/integrated_routes.json").json(),
             requests.get(f"{base_url}/operators_stops.json").json(),
             requests.get(f"{base_url}/nearby_operators_stops.json").json(),
+            requests.get(f"{base_url}/operators_routes.json").json(),
         )
+
+    def get_nlb_route_id(self, route_entry):
+        for operator_route_key in route_entry.get("operator_routes", []):
+            if operator_route_key.startswith("nlb|"):
+                return self.operator_routes[operator_route_key]["id"]
+        return None
 
     # 0-indexed seq
     def getEtas(self, route_id, seq, language):
@@ -50,12 +64,11 @@ class HKEta:
             routeEntry["stops"],
             routeEntry["bound"],
         )
-        dest, service_type, co, nlb_id, gtfs_id = (
+        dest, service_type, co, gtfs_id = (
             routeEntry["dest"],
             routeEntry["serviceType"],
             routeEntry["co"],
-            routeEntry["nlbId"],
-            routeEntry["gtfsId"],
+            routeEntry.get("gtfs_route_id") or routeEntry.get("gtfsId"),
         )
         _etas = []
         for company_id in co:
@@ -80,6 +93,7 @@ class HKEta:
                     )
                 )
             elif company_id == "nlb" and "nlb" in stops:
+                nlb_id = self.get_nlb_route_id(routeEntry)
                 _etas.extend(self.nlb(stop_id=stops["nlb"][seq], nlb_id=nlb_id))
             elif company_id == "lrtfeeder" and "lrtfeeder" in stops:
                 _etas.extend(

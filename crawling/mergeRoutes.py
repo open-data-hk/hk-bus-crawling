@@ -35,7 +35,6 @@ OPERATOR_ROUTE_DERIVED_KEYS = (
     "faresHoliday",
     "freq",
     "jt",
-    "nlbId",
     "orig",
     "seq",
     "serviceType",
@@ -65,7 +64,6 @@ def getRouteObj(
     faresHoliday,
     freq,
     jt,
-    nlbId,
     gtfsRouteId,
     gtfsRouteSeq,
     stops_and_alignment=None,
@@ -86,7 +84,6 @@ def getRouteObj(
         "orig": orig,
         "dest": dest,
         "faresHoliday": faresHoliday,
-        "nlbId": nlbId,
         "seq": seq,
     }
     if fares is not None:
@@ -310,7 +307,6 @@ def importUnmatchedGtfsRoutes(whole_route_list, whole_stop_list):
                 faresHoliday=None,
                 freq=gtfs_route.get("freq", {}).get(route_seq),
                 jt=gtfs_route.get("jt"),
-                nlbId=None,
                 gtfsRouteId=gtfs_route_id,
                 gtfsRouteSeq=route_seq,
                 seq=len(route_seq_stops),
@@ -370,7 +366,6 @@ def importRouteListJson(co, whole_route_list, whole_stop_list, operator_route_di
                 faresHoliday=co_route.get("faresHoliday", None),
                 freq=co_route.get("freq", None),
                 jt=co_route.get("jt", None),
-                nlbId=co_route.get("id", None),
                 gtfsRouteId=getCoRouteGtfsRouteId(co_route),
                 gtfsRouteSeq=co_route.get("gtfs_route_seq"),
                 stops_and_alignment=(
