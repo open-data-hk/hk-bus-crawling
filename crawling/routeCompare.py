@@ -58,13 +58,19 @@ async def routeCompare():
     a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
     oldDb = {
         "routeList": (
-            await emitRequest("https://data.hkbus.app/integrated_routes.json", a_client)
+            await emitRequest(
+                "https://transport-data.open-data.hk/integrated_routes.json", a_client
+            )
         ).json(),
         "stopList": (
-            await emitRequest("https://data.hkbus.app/operators_stops.json", a_client)
+            await emitRequest(
+                "https://transport-data.open-data.hk/operators_stops.json", a_client
+            )
         ).json(),
         "operatorRoutes": (
-            await emitRequest("https://data.hkbus.app/operators_routes.json", a_client)
+            await emitRequest(
+                "https://transport-data.open-data.hk/operators_routes.json", a_client
+            )
         ).json(),
     }
     newDb = load_split_db(DATA_DIR)
