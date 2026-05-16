@@ -109,6 +109,20 @@ def addCircularMetadataToRoute(route, co, co_route):
         route.setdefault("circular_sections", {})[co] = co_route["circular_sections"]
 
 
+def addOperatorRouteToRoute(route, co_route):
+    route_key = co_route["route_key"]
+    operator_routes = route.setdefault("operator_routes", [])
+    if route_key not in operator_routes:
+        operator_routes.append(route_key)
+
+
+def mergeOperatorRoutes(route, found_route):
+    for route_key in found_route.get("operator_routes", []):
+        operator_routes = route.setdefault("operator_routes", [])
+        if route_key not in operator_routes:
+            operator_routes.append(route_key)
+
+
 def isGtfsMatch(whole_route, co_route):
     if whole_route.get("gtfs_route_id") is None:
         return True
@@ -309,6 +323,7 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
                 w_route["bound"][co] = co_route["bound"]
                 addStopAlignmentToRoute(w_route, co, co_route)
                 addCircularMetadataToRoute(w_route, co, co_route)
+                addOperatorRouteToRoute(w_route, co_route)
             elif isOrigDestSameEnName(co_route, w_route):
                 special_type = int(w_route["serviceType"]) + 1
                 if co_route["route"] == "606" and co_route["dest_tc"].startswith(
@@ -340,6 +355,7 @@ def importRouteListJson(co, whole_route_list, whole_stop_list):
                 seq=len(co_route["stops"]),
             )
             addCircularMetadataToRoute(route_obj, co, co_route)
+            addOperatorRouteToRoute(route_obj, co_route)
             whole_route_list.append(route_obj)
 
 
@@ -359,6 +375,17 @@ def getRouteId(v):
         v["orig"]["en"],
         v["dest"]["en"],
     )
+
+
+def buildRouteListDict(route_list):
+    route_list_dict = {}
+    for route in route_list:
+        route_id = getRouteId(route)
+        if route_id in route_list_dict:
+            mergeOperatorRoutes(route_list_dict[route_id], route)
+        else:
+            route_list_dict[route_id] = route
+    return route_list_dict
 
 
 def get_operator_stop_key(co, stop):
@@ -480,6 +507,7 @@ def smartUnique(route_list):
                 route_i.setdefault("circular_sections", {}).update(
                     route_list[found]["circular_sections"]
                 )
+            mergeOperatorRoutes(route_i, route_list[found])
             route_list[found]["skip"] = True
 
         # append return array
@@ -587,7 +615,7 @@ def main():
 
     db = standardizeDict(
         {
-            "routeList": {getRouteId(v): v for v in routeList},
+            "routeList": buildRouteListDict(routeList),
             "stopList": stopList,
             # TODO: simply set it is empty dict
             "stopMap": stopMap,
