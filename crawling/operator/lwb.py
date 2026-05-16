@@ -1,8 +1,8 @@
 from .base_operator import BaseOperator
 
 
-class KMB(BaseOperator):
-    code = "kmb"
+class LWB(BaseOperator):
+    code = "lwb"
 
     @classmethod
     def route_key(cls, route):

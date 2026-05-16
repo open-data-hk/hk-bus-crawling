@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import sys
 from collections.abc import Mapping, MutableMapping
+from pathlib import Path
 from typing import Any
 
 try:
     from crawling.operator import get_operator_class
-except ImportError:
-    from operator import get_operator_class
+except ModuleNotFoundError:
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
+    from crawling.operator import get_operator_class
 
 ROUTE_FARE_KEY_SEPARATOR = "|"
 ROUTE_FARE_KEY_LIST_SEPARATOR = ","

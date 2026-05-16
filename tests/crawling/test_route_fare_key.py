@@ -1,5 +1,6 @@
 import pytest
 
+from crawling.operator import OPERATOR_CLASSES
 from crawling.route_fare_key import build_route_fare_dict, get_route_unique_key
 
 
@@ -42,7 +43,7 @@ def test_get_route_fare_key_falls_back_to_gtfs_list():
 
 def test_build_route_fare_dict_rejects_duplicate_keys():
     route = {
-        "co": ["mtr"],
+        "co": ["unknown"],
         "route": "AEL",
         "bound": "DT",
         "service_type": "1",
@@ -51,7 +52,7 @@ def test_build_route_fare_dict_rejects_duplicate_keys():
     }
 
     with pytest.raises(ValueError, match="Duplicate routeFare key"):
-        build_route_fare_dict([route, route.copy()], source="mtr")
+        build_route_fare_dict([route, route.copy()], source="unknown")
 
 
 def test_build_route_fare_dict_stores_route_key_inside_route():
@@ -66,7 +67,7 @@ def test_build_route_fare_dict_stores_route_key_inside_route():
     }
 
     route_fare_dict = build_route_fare_dict([route], source="mtr")
-    route_key = "mtr|AEL|DT|1|AsiaWorld-Expo|Hong Kong|AWE|HOK|3||"
+    route_key = "mtr|AEL|DT"
 
     assert route_fare_dict == {route_key: route}
     assert route["route_key"] == route_key
@@ -142,3 +143,78 @@ def test_build_route_fare_dict_falls_back_when_operator_route_key_collides():
     }
     assert first_route["route_key"] == first_route_key
     assert second_route["route_key"] == second_route_key
+
+
+def test_all_provider_operator_classes_are_registered():
+    assert sorted(OPERATOR_CLASSES) == [
+        "ctb",
+        "fortuneferry",
+        "gmb",
+        "hkkf",
+        "kmb",
+        "lightRail",
+        "lrtfeeder",
+        "lwb",
+        "mtr",
+        "nlb",
+        "sunferry",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("source", "route", "route_key"),
+    [
+        (
+            "ctb",
+            {
+                "route": "1",
+                "bound": "O",
+                "gtfs_route_id": "1480",
+                "gtfs_route_seq": "1",
+            },
+            "ctb|1|O|1480|1",
+        ),
+        ("fortuneferry", {"route": "7059", "bound": "I"}, "fortuneferry|7059|I"),
+        (
+            "gmb",
+            {
+                "route": "1",
+                "gtfs_route_id": "2006408",
+                "gtfs_route_seq": "1",
+            },
+            "gmb|1|2006408|1",
+        ),
+        ("hkkf", {"route": "KF1", "bound": "O"}, "hkkf|KF1|O"),
+        ("lightRail", {"route": "505", "bound": "I"}, "lightRail|505|I"),
+        (
+            "lrtfeeder",
+            {
+                "route": "K75S",
+                "service_type": "1",
+                "gtfs_route_id": "1870",
+                "gtfs_route_seq": "1",
+            },
+            "lrtfeeder|K75S|1|1870|1",
+        ),
+        ("lwb", {"route": "A31", "bound": "O", "service_type": "1"}, "lwb|A31|O|1"),
+        ("mtr", {"route": "AEL", "bound": "DT"}, "mtr|AEL|DT"),
+        (
+            "nlb",
+            {
+                "route": "1",
+                "id": "1",
+                "gtfs_route_id": "1723",
+                "gtfs_route_seq": "1",
+            },
+            "nlb|1|1|1723|1",
+        ),
+        ("sunferry", {"route": "CECC"}, "sunferry|CECC"),
+    ],
+)
+def test_operator_route_keys_are_compact(source, route, route_key):
+    route["co"] = [source]
+
+    route_fare_dict = build_route_fare_dict([route], source=source)
+
+    assert route_fare_dict == {route_key: route}
+    assert route["route_key"] == route_key
