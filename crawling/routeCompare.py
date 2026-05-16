@@ -12,8 +12,15 @@ import time
 
 import httpx
 import xxhash
-from crawl_utils import emitRequest
-from utils import DATA_DIR
+
+try:
+    from .constants import GH_PAGE_DOMAIN
+    from .crawl_utils import emitRequest
+    from .utils import DATA_DIR
+except ImportError:
+    from constants import GH_PAGE_DOMAIN
+    from crawl_utils import emitRequest
+    from utils import DATA_DIR
 
 
 def load_split_db(data_dir):
@@ -55,24 +62,27 @@ def get_route_operator_stops(db, route):
 
 
 async def routeCompare():
-    a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
-    oldDb = {
-        "routeList": (
-            await emitRequest(
-                "https://transport-data.open-data.hk/integrated_routes.json", a_client
-            )
-        ).json(),
-        "stopList": (
-            await emitRequest(
-                "https://transport-data.open-data.hk/operators_stops.json", a_client
-            )
-        ).json(),
-        "operatorRoutes": (
-            await emitRequest(
-                "https://transport-data.open-data.hk/operators_routes.json", a_client
-            )
-        ).json(),
-    }
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None)) as a_client:
+        oldDb = {
+            "routeList": (
+                await emitRequest(
+                    f"{GH_PAGE_DOMAIN}/integrated_routes.json",
+                    a_client,
+                )
+            ).json(),
+            "stopList": (
+                await emitRequest(
+                    f"{GH_PAGE_DOMAIN}/operators_stops.json",
+                    a_client,
+                )
+            ).json(),
+            "operatorRoutes": (
+                await emitRequest(
+                    f"{GH_PAGE_DOMAIN}/operators_routes.json",
+                    a_client,
+                )
+            ).json(),
+        }
     newDb = load_split_db(DATA_DIR)
     changedStops = set()
 
