@@ -139,6 +139,17 @@ jobs:
           aws s3 cp data/nlb.raw.routeStopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/nlb/nlb.raw.routeStopList.json
           aws s3 cp data/nlb.raw.stopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/nlb/nlb.raw.stopList.json
 
+      - name: Upload integrated data to S3
+        run: |
+          aws s3 cp data/holidays.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/holidays.json
+          aws s3 cp data/gtfs.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/gtfs.json
+          aws s3 cp data/nearby_operators_stops.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/nearby_operators_stops.json
+          aws s3 cp data/operators_stops.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/operators_stops.json
+          aws s3 cp data/service_days.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/service_days.json
+          aws s3 cp data/operators_routes.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/operators_routes.json
+          aws s3 cp data/integrated_routes.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/integrated_routes.json
+          aws s3 cp data/gtfs_operators_stops_map.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/gtfs_operators_stops_map.json
+
       - name: Archive crawling outputs
         uses: actions/upload-artifact@v7
         if: always()
