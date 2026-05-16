@@ -117,32 +117,19 @@ jobs:
           poetry run python ./crawling/cleansing.py
           poetry run python ./crawling/mergeRoutes.py
           poetry run python ./crawling/mergeStopList.py
-          # poetry run python ./crawling/routeCompare.py
+          poetry run python ./crawling/routeCompare.py
           poetry run python ./crawling/mtrExits.py
 
-      - name: Update MD5
-        shell: bash
+      - name: Upload integrated data to S3
         run: |
-          md5sum data/routeFareList.min.json | cut -f1 -d ' ' | tr -d $'\n' > data/routeFareList.md5
-
-      - name: Upload GMB raw data to S3
-        run: |
-          aws s3 cp data/gmb.raw.routeNoList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeNoList.json
-          aws s3 cp data/gmb.raw.routeList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeList.json
-          aws s3 cp data/gmb.raw.routeStopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeStopList.json
-          aws s3 cp data/gmb.raw.stopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.stopList.json
-
-      - name: Upload CTB raw data to S3
-        run: |
-          aws s3 cp data/ctb.raw.routeList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.routeList.json
-          aws s3 cp data/ctb.raw.routeStopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.routeStopList.json
-          aws s3 cp data/ctb.raw.stopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.stopList.json
-
-      - name: Upload NLB raw data to S3
-        run: |
-          aws s3 cp data/nlb.raw.routeList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/nlb/nlb.raw.routeList.json
-          aws s3 cp data/nlb.raw.routeStopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/nlb/nlb.raw.routeStopList.json
-          aws s3 cp data/nlb.raw.stopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/nlb/nlb.raw.stopList.json
+          aws s3 cp data/holidays.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/holidays.json
+          aws s3 cp data/gtfs.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/gtfs.json
+          aws s3 cp data/nearby_operators_stops.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/nearby_operators_stops.json
+          aws s3 cp data/operators_stops.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/operators_stops.json
+          aws s3 cp data/service_days.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/service_days.json
+          aws s3 cp data/operators_routes.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/operators_routes.json
+          aws s3 cp data/integrated_routes.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/integrated_routes.json
+          aws s3 cp data/gtfs_operators_stops_map.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/integrated/gtfs_operators_stops_map.json
 
       - name: Archive crawling outputs
         uses: actions/upload-artifact@v7
@@ -151,7 +138,11 @@ jobs:
           name: Crawled Files
           retention-days: 14
           path: |
-            data/holiday.json
+            data/holidays.json
+            data/integrated_routes.json
+            data/service_days.json
+            data/operators_stops.json
+            data/nearby_operators_stops.json
             data/routeFareList*
             data/routeList*
             data/stopCandidates*
@@ -160,7 +151,7 @@ jobs:
             data/routeTime.json
             data/gtfs-tc
             data/gtfs.json
-            data/gtfsOperatorsStopsMap.json
+            data/gtfs_operators_stops_map.json
             data/routeGtfs*
             data/gtfs-tc.zip
             data/ROUTE_BUS.xml
@@ -174,12 +165,14 @@ jobs:
         shell: bash
         run: |
           cp \
-          data/routeFareList.json \
-          data/routeFareList.min.json \
-          data/routeFareList.md5 \
+          data/holidays.json \
+          data/integrated_routes.json \
+          data/service_days.json \
+          data/operators_stops.json \
+          data/nearby_operators_stops.json \
           CNAME \
           data/exits.mtr.json \
-          data/gtfsOperatorsStopsMap.json \
+          data/gtfs_operators_stops_map.json \
           data/0versions.json \
           build/
       - name: cp route-ts into deployment folder

@@ -35,7 +35,6 @@ OPERATOR_ROUTE_DERIVED_KEYS = (
     "faresHoliday",
     "freq",
     "jt",
-    "nlbId",
     "orig",
     "seq",
     "serviceType",
@@ -65,7 +64,6 @@ def getRouteObj(
     faresHoliday,
     freq,
     jt,
-    nlbId,
     gtfsRouteId,
     gtfsRouteSeq,
     stops_and_alignment=None,
@@ -86,7 +84,6 @@ def getRouteObj(
         "orig": orig,
         "dest": dest,
         "faresHoliday": faresHoliday,
-        "nlbId": nlbId,
         "seq": seq,
     }
     if fares is not None:
@@ -310,7 +307,6 @@ def importUnmatchedGtfsRoutes(whole_route_list, whole_stop_list):
                 faresHoliday=None,
                 freq=gtfs_route.get("freq", {}).get(route_seq),
                 jt=gtfs_route.get("jt"),
-                nlbId=None,
                 gtfsRouteId=gtfs_route_id,
                 gtfsRouteSeq=route_seq,
                 seq=len(route_seq_stops),
@@ -370,7 +366,6 @@ def importRouteListJson(co, whole_route_list, whole_stop_list, operator_route_di
                 faresHoliday=co_route.get("faresHoliday", None),
                 freq=co_route.get("freq", None),
                 jt=co_route.get("jt", None),
-                nlbId=co_route.get("id", None),
                 gtfsRouteId=getCoRouteGtfsRouteId(co_route),
                 gtfsRouteSeq=co_route.get("gtfs_route_seq"),
                 stops_and_alignment=(
@@ -617,6 +612,21 @@ def compressRouteStopAlignments(route_list):
             )
 
 
+def get_operator_route_provider(route_key):
+    return route_key.split("|", 1)[0]
+
+
+def compressOperatorRouteStopAlignments(operator_routes):
+    for route_key, route in operator_routes.items():
+        if "stop_alignment" not in route:
+            continue
+        co = get_operator_route_provider(route_key)
+        route["stop_alignment"] = compressStopAlignment(
+            {co: route["stop_alignment"]}, [co]
+        )
+        route.pop("stops", None)
+
+
 def standardizeDict(d):
     return {
         key: value if not isinstance(value, dict) else standardizeDict(value)
@@ -637,8 +647,27 @@ def main():
         route["stops"] = {co: stops for co, stops in route["stops"]}
     gtfsStopMap = buildGtfsStopMap(routeList)
     writeJson(
-        DATA_DIR / "gtfsOperatorsStopsMap.json",
+        DATA_DIR / "gtfs_operators_stops_map.json",
         standardizeDict(gtfsStopMap),
+        separators=(",", ":"),
+    )
+    # TODO: low priority, align sequence of all operators and GTFS together, currently they are aligned separately
+    # extra stop from one operator will append row individually
+    # if 3 operators have the same extra stop, their will be 3 rows appended
+    compressRouteStopAlignments(routeList)
+    compressOperatorRouteStopAlignments(operator_routes)
+
+    serviceDayMap = loadJson(DATA_DIR / "gtfs.json")["serviceDayMap"]
+
+    integrated_routes = standardizeDict(
+        removeOperatorRouteDerivedInfo(buildRouteListDict(routeList))
+    )
+    service_days = standardizeDict(serviceDayMap)
+    operator_stops = standardizeDict(stopList)
+
+    writeJson(
+        DATA_DIR / "integrated_routes.json",
+        integrated_routes,
         separators=(",", ":"),
     )
     writeJson(
@@ -646,27 +675,15 @@ def main():
         standardizeDict(operator_routes),
         separators=(",", ":"),
     )
-    # TODO: low priority, align sequence of all operators and GTFS together, currently they are aligned separately
-    # extra stop from one operator will append row individually
-    # if 3 operators have the same extra stop, their will be 3 rows appended
-    compressRouteStopAlignments(routeList)
-
-    holidays = loadJson(DATA_DIR / "holiday.json")
-    serviceDayMap = loadJson(DATA_DIR / "gtfs.json")["serviceDayMap"]
-
-    db = standardizeDict(
-        {
-            "routeList": removeOperatorRouteDerivedInfo(buildRouteListDict(routeList)),
-            "stopList": stopList,
-            # TODO: simply set it is empty dict
-            "stopMap": stopMap,
-            "holidays": holidays,
-            "serviceDayMap": serviceDayMap,
-        }
-    )
-
     writeJson(
-        DATA_DIR / "routeFareList.mergeRoutes.min.json", db, separators=(",", ":")
+        DATA_DIR / "service_days.json",
+        service_days,
+        separators=(",", ":"),
+    )
+    writeJson(
+        DATA_DIR / "operators_stops.json",
+        operator_stops,
+        separators=(",", ":"),
     )
 
 

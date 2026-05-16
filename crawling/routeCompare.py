@@ -2,6 +2,8 @@
 # Check route latest update time
 
 import asyncio
+import csv
+import io
 import json
 import logging
 import os
@@ -10,16 +12,78 @@ import time
 
 import httpx
 import xxhash
-from crawl_utils import emitRequest
-from utils import DATA_DIR
+
+try:
+    from .constants import GH_PAGE_DOMAIN
+    from .crawl_utils import emitRequest
+    from .utils import DATA_DIR
+except ImportError:
+    from constants import GH_PAGE_DOMAIN
+    from crawl_utils import emitRequest
+    from utils import DATA_DIR
+
+
+def load_split_db(data_dir):
+    with open(data_dir / "integrated_routes.json", encoding="UTF-8") as f:
+        route_list = json.load(f)
+    with open(data_dir / "operators_stops.json", encoding="UTF-8") as f:
+        stop_list = json.load(f)
+    with open(data_dir / "operators_routes.json", encoding="UTF-8") as f:
+        operator_routes = json.load(f)
+    return {
+        "routeList": route_list,
+        "stopList": stop_list,
+        "operatorRoutes": operator_routes,
+    }
+
+
+def get_route_operator_stops(db, route):
+    if "stops" in route:
+        return route["stops"].values()
+
+    operator_stops = []
+    for route_key in route.get("operator_routes", []):
+        operator_route = db["operatorRoutes"][route_key]
+        if "stops" in operator_route:
+            operator_stops.append(operator_route["stops"])
+            continue
+
+        co = route_key.split("|", 1)[0]
+        stop_alignment = operator_route.get("stop_alignment")
+        if isinstance(stop_alignment, str):
+            operator_stops.append(
+                [
+                    row[co]
+                    for row in csv.DictReader(io.StringIO(stop_alignment))
+                    if row.get(co) not in (None, "", "/")
+                ]
+            )
+    return operator_stops
 
 
 async def routeCompare():
-    a_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None))
-    r = await emitRequest("https://data.hkbus.app/routeFareList.min.json", a_client)
-    r.encoding = "utf-8"
-    oldDb = r.json()
-    newDb = json.load(open(DATA_DIR / "routeFareList.min.json", "r", encoding="UTF-8"))
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, pool=None)) as a_client:
+        oldDb = {
+            "routeList": (
+                await emitRequest(
+                    f"{GH_PAGE_DOMAIN}/integrated_routes.json",
+                    a_client,
+                )
+            ).json(),
+            "stopList": (
+                await emitRequest(
+                    f"{GH_PAGE_DOMAIN}/operators_stops.json",
+                    a_client,
+                )
+            ).json(),
+            "operatorRoutes": (
+                await emitRequest(
+                    f"{GH_PAGE_DOMAIN}/operators_routes.json",
+                    a_client,
+                )
+            ).json(),
+        }
+    newDb = load_split_db(DATA_DIR)
     changedStops = set()
 
     os.makedirs(DATA_DIR / "route-ts", exist_ok=True)
@@ -39,8 +103,10 @@ async def routeCompare():
 
     for newKey in newDb["routeList"]:
         busStopsinRoute = set()
-        for provider in newDb["routeList"][newKey]["stops"]:
-            busStopsinRoute.update(newDb["routeList"][newKey]["stops"][provider])
+        for operator_stops in get_route_operator_stops(
+            newDb, newDb["routeList"][newKey]
+        ):
+            busStopsinRoute.update(operator_stops)
         if (
             newKey not in oldDb["routeList"]
             or bool(changedStops & busStopsinRoute)

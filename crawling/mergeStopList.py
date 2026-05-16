@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 import logging
 import math
@@ -232,6 +234,21 @@ def get_operator_route_provider(route_key: str) -> str:
     return route_key.split("|", 1)[0]
 
 
+def get_operator_route_stops(operator_route: dict, co: str) -> list[str]:
+    if "stops" in operator_route:
+        return operator_route["stops"]
+
+    stop_alignment = operator_route.get("stop_alignment")
+    if not isinstance(stop_alignment, str):
+        raise KeyError("operator route has neither stops nor stop_alignment")
+
+    return [
+        row[co]
+        for row in csv.DictReader(io.StringIO(stop_alignment))
+        if row.get(co) not in (None, "", "/")
+    ]
+
+
 def get_route_stops(
     route_list_entry: RouteListEntry, operator_routes: OperatorRoutes
 ) -> dict[str, list[str]]:
@@ -242,7 +259,7 @@ def get_route_stops(
     for operator_route_key in route_list_entry.get("operator_routes", []):
         operator_route = operator_routes[operator_route_key]
         co = get_operator_route_provider(operator_route_key)
-        route_stops[co] = operator_route["stops"]
+        route_stops[co] = get_operator_route_stops(operator_route, co)
     return route_stops
 
 
@@ -251,13 +268,10 @@ def get_route_stops(
 
 def merge_stop_list() -> None:
     # Read the result from previous pipeline
-    with open(
-        DATA_DIR / "routeFareList.mergeRoutes.min.json", "r", encoding="UTF-8"
-    ) as f:
-        db = json.load(f)
-
-    route_list = cast(RouteList, db["routeList"])
-    stop_list = cast(StopList, db["stopList"])
+    with open(DATA_DIR / "integrated_routes.json", "r", encoding="UTF-8") as f:
+        route_list = cast(RouteList, json.load(f))
+    with open(DATA_DIR / "operators_stops.json", "r", encoding="UTF-8") as f:
+        stop_list = cast(StopList, json.load(f))
     with open(DATA_DIR / "operators_routes.json", "r", encoding="UTF-8") as f:
         operator_routes = cast(OperatorRoutes, json.load(f))
 
@@ -360,12 +374,7 @@ def merge_stop_list() -> None:
         f"Processed {count} stops ({len(stop_map)} groups) at {(time.time() - start_time) * 1000:.2f}ms"
     )
 
-    db["stopMap"] = sorted(stop_map)
-
-    with open(DATA_DIR / "routeFareList.json", "w", encoding="UTF-8") as f:
-        json.dump(db, f, ensure_ascii=False)
-
-    # reduce size of routeFareList.min.json by rounding lat/lng values to 5 decimal places
+    # reduce size by rounding lat/lng values to 5 decimal places
     # 5 d.p. is roughly one-metre accuracy, it is good enough for this project
     # saves around 50kb in size for 14,000 stops
     for stop_id, stop in target_stop_list:
@@ -376,14 +385,14 @@ def merge_stop_list() -> None:
             "%.5f" % (stop_list[stop_id]["location"]["lng"])
         )
 
-    db["stopList"] = stop_list
-
     logger.info(
         f"Reduced location lat/lng to 5 d.p. at {(time.time() - start_time) * 1000:.2f}ms"
     )
 
-    with open(DATA_DIR / "routeFareList.min.json", "w", encoding="UTF-8") as f:
-        json.dump(db, f, ensure_ascii=False)
+    with open(DATA_DIR / "operators_stops.json", "w", encoding="UTF-8") as f:
+        json.dump(stop_list, f, ensure_ascii=False, separators=(",", ":"))
+    with open(DATA_DIR / "nearby_operators_stops.json", "w", encoding="UTF-8") as f:
+        json.dump(sorted(stop_map), f, ensure_ascii=False, separators=(",", ":"))
 
 
 if __name__ == "__main__":

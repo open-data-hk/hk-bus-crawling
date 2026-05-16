@@ -9,7 +9,8 @@ __author__ = "Chun Law"
 __email__ = "chunlaw@rocketmail.com"
 __status__ = "production"
 
-import hashlib
+import csv
+import io
 import re
 import time
 from datetime import datetime, timezone
@@ -33,40 +34,83 @@ class HKEta:
     route_list = None
     stop_list = None
     stop_map = None
+    operator_routes = None
 
     def __init__(self):
-        md5 = requests.get(
-            "https://hkbus.github.io/hk-bus-crawling/routeFareList.md5"
-        ).text
-        r = requests.get(
-            "https://hkbus.github.io/hk-bus-crawling/routeFareList.min.json"
+        base_url = "https://open-data-hk.github.io/hk-bus-crawling"
+        (
+            self.holidays,
+            self.route_list,
+            self.stop_list,
+            self.stop_map,
+            self.operator_routes,
+        ) = (
+            requests.get(f"{base_url}/holidays.json").json(),
+            requests.get(f"{base_url}/integrated_routes.json").json(),
+            requests.get(f"{base_url}/operators_stops.json").json(),
+            requests.get(f"{base_url}/nearby_operators_stops.json").json(),
+            requests.get(f"{base_url}/operators_routes.json").json(),
         )
-        m = hashlib.md5()
-        m.update(r.text.encode("utf-8"))
-        if md5 != m.hexdigest():
-            raise Exception("Error in accessing hk-eta-db, md5sum not match")
-        db = r.json()
-        self.holidays, self.route_list, self.stop_list, self.stop_map = (
-            db["holidays"],
-            db["routeList"],
-            db["stopList"],
-            db["stopMap"],
+
+    def get_nlb_route_id(self, route_entry):
+        for operator_route_key in route_entry.get("operator_routes", []):
+            if operator_route_key.startswith("nlb|"):
+                return self.operator_routes[operator_route_key]["id"]
+        return None
+
+    def get_operator_route_stops(self, operator_route_key, operator_route):
+        if "stops" in operator_route:
+            return operator_route["stops"]
+
+        co = operator_route_key.split("|", 1)[0]
+        stop_alignment = operator_route.get("stop_alignment")
+        if not isinstance(stop_alignment, str):
+            return []
+
+        return [
+            row[co]
+            for row in csv.DictReader(io.StringIO(stop_alignment))
+            if row.get(co) not in (None, "", "/")
+        ]
+
+    def get_operator_route_details(self, route_entry):
+        operator_routes = {
+            route_key.split("|", 1)[0]: self.operator_routes[route_key]
+            for route_key in route_entry.get("operator_routes", [])
+        }
+        stops = route_entry.get("stops") or {
+            co: self.get_operator_route_stops(route_key, operator_route)
+            for co, route_key, operator_route in (
+                (route_key.split("|", 1)[0], route_key, self.operator_routes[route_key])
+                for route_key in route_entry.get("operator_routes", [])
+            )
+        }
+        bound = route_entry.get("bound") or {
+            co: operator_route.get("bound")
+            for co, operator_route in operator_routes.items()
+        }
+        co = route_entry.get("co") or list(operator_routes.keys())
+        first_operator_route = next(iter(operator_routes.values()), {})
+        dest = route_entry.get("dest") or {
+            "zh": first_operator_route.get("dest_tc"),
+            "en": first_operator_route.get("dest_en"),
+        }
+        service_type = route_entry.get("serviceType") or first_operator_route.get(
+            "service_type"
         )
+        gtfs_id = (
+            route_entry.get("gtfs_route_id")
+            or route_entry.get("gtfsId")
+            or first_operator_route.get("gtfs_route_id")
+        )
+        return stops, bound, co, dest, service_type, gtfs_id
 
     # 0-indexed seq
     def getEtas(self, route_id, seq, language):
         routeEntry = self.route_list[route_id]
-        route, stops, bound = (
-            routeEntry["route"],
-            routeEntry["stops"],
-            routeEntry["bound"],
-        )
-        dest, service_type, co, nlb_id, gtfs_id = (
-            routeEntry["dest"],
-            routeEntry["serviceType"],
-            routeEntry["co"],
-            routeEntry["nlbId"],
-            routeEntry["gtfsId"],
+        route = routeEntry["route"]
+        stops, bound, co, dest, service_type, gtfs_id = self.get_operator_route_details(
+            routeEntry
         )
         _etas = []
         for company_id in co:
@@ -91,6 +135,7 @@ class HKEta:
                     )
                 )
             elif company_id == "nlb" and "nlb" in stops:
+                nlb_id = self.get_nlb_route_id(routeEntry)
                 _etas.extend(self.nlb(stop_id=stops["nlb"][seq], nlb_id=nlb_id))
             elif company_id == "lrtfeeder" and "lrtfeeder" in stops:
                 _etas.extend(

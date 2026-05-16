@@ -879,6 +879,12 @@ def add_gtfs_stop_alignment(
     )
 
 
+def remove_redundant_gtfs_export_fields(route_fare_dict: dict[str, Route]) -> None:
+    for route in route_fare_dict.values():
+        route.pop("gtfs", None)
+        route.pop("gtfs_stops", None)
+
+
 def match_co_routes_with_gtfs(co: str) -> None:
     """Match and enrich one operator's routes with GTFS fares, frequencies, and aligned stops.
 
@@ -1175,6 +1181,7 @@ def match_co_routes_with_gtfs(co: str) -> None:
         exported_route_keys=EXPORTED_ROUTE_FARE_KEYS,
         source=co,
     )
+    remove_redundant_gtfs_export_fields(route_fare_dict)
 
     with open(DATA_DIR / ("routeFareList.%s.json" % co), "w", encoding="UTF-8") as f:
         f.write(json.dumps(route_fare_dict, ensure_ascii=False))

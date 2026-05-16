@@ -3,20 +3,20 @@ from pathlib import Path
 
 from crawling.gtfs_fare import parse_fare_csv
 
-SNAPSHOT = Path("tests/snapshots/routeFareList.min.json")
-DATA = Path("data/routeFareList.min.json")
+SNAPSHOT = Path("tests/snapshots/operators_routes.json")
+DATA = Path("data/operators_routes.json")
 
 
 def load_files():
     with open(SNAPSHOT, encoding="utf-8") as f:
         snapshot = {
             k: {"fares": v.get("fares"), "faresHoliday": v.get("faresHoliday")}
-            for k, v in json.load(f)["routeList"].items()
+            for k, v in json.load(f).items()
         }
     with open(DATA, encoding="utf-8") as f:
         current = {
             k: {"fares": v.get("fares"), "faresHoliday": v.get("faresHoliday")}
-            for k, v in json.load(f)["routeList"].items()
+            for k, v in json.load(f).items()
         }
     return snapshot, current
 

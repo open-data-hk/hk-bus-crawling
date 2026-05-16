@@ -17,7 +17,7 @@ Scripts must run after their listed inputs exist. Layers describe the earliest p
 
 | Script | Reads | Output files |
 |--------|-------|-------------|
-| `parseHoliday.py` | - | `holiday.json` |
+| `parseHoliday.py` | - | `holidays.json` |
 | `ctb_crawl.py` | - | `ctb.raw.routeList.json`, `ctb.raw.routeStopList.json`, `ctb.raw.stopList.json` |
 | `ctb.py` | `ctb.raw.routeList.json`, `ctb.raw.routeStopList.json`, `ctb.raw.stopList.json` | `routeList.ctb.json`, `stopList.ctb.json` |
 | `kmb_crawl.py` | - | `kmb.raw.routeList.json`, `kmb.raw.routeStopList.json`, `kmb.raw.stopList.json` |
@@ -53,23 +53,23 @@ These can run once Layer 1 completes and any listed raw files from Layer 2 exist
 |--------|-------|-------------|
 | `cleansing.py` | `routeFareList.{co}.json` (all operators) | `routeFareList.{co}.cleansed.json` |
 
-### Layer 6 — Needs `.cleansed.json` + `holiday.json` + `gtfs.json`
+### Layer 6 — Needs `.cleansed.json` + `gtfs.json`
 
 | Script | Reads | Output files |
 |--------|-------|-------------|
-| `mergeRoutes.py` | `routeFareList.{co}.cleansed.json`, `stopList.{co}.json`, `holiday.json`, `gtfs.json` | `routeFareList.mergeRoutes.min.json`, `operators_routes.json` |
+| `mergeRoutes.py` | `routeFareList.{co}.cleansed.json`, `stopList.{co}.json`, `gtfs.json` | `integrated_routes.json`, `service_days.json`, `operators_stops.json`, `operators_routes.json` |
 
-### Layer 7 — Needs `routeFareList.mergeRoutes.min.json`
-
-| Script | Reads | Output files |
-|--------|-------|-------------|
-| `mergeStopList.py` | `routeFareList.mergeRoutes.min.json` | `routeFareList.json`, `routeFareList.min.json` |
-
-### Layer 8 — Needs `routeFareList.min.json`
+### Layer 7 — Needs integrated routes and operator stops
 
 | Script | Reads | Output files |
 |--------|-------|-------------|
-| `routeCompare.py` | `routeFareList.min.json` | `route-ts/` |
+| `mergeStopList.py` | `integrated_routes.json`, `operators_stops.json`, `operators_routes.json` | `operators_stops.json`, `nearby_operators_stops.json` |
+
+### Layer 8 — Needs split route/stop files
+
+| Script | Reads | Output files |
+|--------|-------|-------------|
+| `routeCompare.py` | `integrated_routes.json`, `operators_stops.json` | `route-ts/` |
 
 ---
 
@@ -81,6 +81,5 @@ These can run once Layer 1 completes and any listed raw files from Layer 2 exist
 - **`parseGtfs.py` can run at the start** after `parseJourneyTime.py`, because `routeTime.json` is its only generated input.
 - **`sunferry.py` and `fortuneferry.py`** require `gtfs.json`, so they must wait for `parseGtfs.py`.
 - **`gmb.py` reads raw files from `gmb_crawl.py`** plus GTFS calendar data. Run `gmb_crawl.py` and `parseGtfs.py` before `gmb.py`.
-- **`mergeRoutes.py`** has a cross-layer dependency on `holiday.json` from Layer 2, so `parseHoliday.py` must complete before Layer 6.
 - **`mtrExits.py`** is fully independent and can run at any time — nothing downstream consumes its output.
 - The current workflow (`fetch-data.yml`) runs all scripts sequentially; independent scripts in layers 2 and 3 are candidates for parallelisation.

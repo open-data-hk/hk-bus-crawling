@@ -2,7 +2,7 @@
 
 [![Python 3.8.8](https://img.shields.io/badge/python-3.8.8-blue.svg)](https://www.python.org/downloads/release/python-388/) ![Data fetching status](https://github.com/hkbus/hk-bus-crawling/actions/workflows/fetch-data.yml/badge.svg) 
 
-This project is to fetch the bus route information of KMB, CTB, NLB, minibus, MTR, lightrail into one single JSON. It is daily synced to data.gov.hk and launched in gh-pages.
+This project fetches bus route information for KMB, CTB, NLB, minibus, MTR, and lightrail. The crawled route, stop, service-day, holiday, and nearby-stop data is published as separate JSON files in gh-pages.
 
 ## Fetching Transport ETA
 
@@ -47,7 +47,7 @@ print( route_ids )
 ## Data Crawling by yourself
 
 ### Usage
-Daily fetched JSON is in [gh-pages](https://github.com/hkbus/hk-bus-crawling/tree/gh-pages) or direct download [here](https://hkbus.github.io/hk-bus-crawling/routeFareList.min.json)
+Daily fetched JSON is in [gh-pages](https://github.com/open-data-hk/hk-bus-crawling/tree/gh-pages), including [integrated_routes.json](https://open-data-hk.github.io/hk-bus-crawling/integrated_routes.json), [operators_stops.json](https://open-data-hk.github.io/hk-bus-crawling/operators_stops.json), [nearby_operators_stops.json](https://open-data-hk.github.io/hk-bus-crawling/nearby_operators_stops.json), [service_days.json](https://open-data-hk.github.io/hk-bus-crawling/service_days.json), and [holidays.json](https://open-data-hk.github.io/hk-bus-crawling/holidays.json).
 
 ### Installation
 
