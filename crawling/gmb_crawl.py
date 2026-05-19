@@ -210,7 +210,14 @@ async def prepare_route_stop_list(a_client, all_routes: dict, force: bool):
         local_last_update = {
             key: route_stops["data_timestamp"]
             for key, route_stops in all_route_stops.items()
+            # skip empty route_stops entry which has no data_timestamp
+            # e.g. https://data.etagmb.gov.hk/route-stop/2001132/1
+            if "data_timestamp" in route_stops
         }
+
+        for key, route_stops in all_route_stops.items():
+            if "data_timestamp" not in route_stops:
+                logger.warning(f"{key} has no data_timestamp, will be refetched")
 
         remote_record = await get_last_update("route-stop", a_client)
         remote_last_update = {
