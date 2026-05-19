@@ -215,6 +215,10 @@ async def prepare_route_stop_list(a_client, all_routes: dict, force: bool):
             if "data_timestamp" in route_stops
         }
 
+        for key, route_stops in all_route_stops.items():
+            if "data_timestamp" not in route_stops:
+                logger.warning(f"{key} has no data_timestamp, will be refetched")
+
         remote_record = await get_last_update("route-stop", a_client)
         remote_last_update = {
             f"{entry['route_id']}-{entry['route_seq']}": entry["last_update_date"]
