@@ -67,7 +67,6 @@ async def prepare_data():
     route_list = load_raw_json(RAW_ROUTE_LIST)
     route_stop_list = load_raw_json(RAW_ROUTE_STOP_LIST)
     stop_list_raw = load_raw_json(RAW_STOP_LIST)
-    stop_list_raw = [stop for stop in stop_list_raw if stop != {}]
 
     logger.info("Preparing data of ctb")
 
@@ -76,7 +75,8 @@ async def prepare_data():
     stopInfos = list(zip(_stop_ids, stop_list_raw))
     for stopId, stopInfo in stopInfos:
         stop_list[stopId] = stopInfo
-        stopInfo["lng"] = stopInfo.pop("long")
+        if stopInfo:
+            stopInfo["lng"] = stopInfo.pop("long")
 
     _routeList: list[ProviderRoute] = []
     for route in route_list:
