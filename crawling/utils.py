@@ -27,7 +27,9 @@ def download_igeocom_geojson():
     logger.info("downloading iGeoCom.geojson")
 
     url = "https://open.hkmapservice.gov.hk/OpenData/directDownload?productName=iGeoCom&sheetName=iGeoCom&productFormat=GEOJSON"
-    response = requests.get(url)
+    # Dirty way to suppress SSLCertVerificationError
+    # TODO: revert after proper fix for 'open.hkmapservice.gov.hk'
+    response = requests.get(url, verify=False)
     response.raise_for_status()
     with zipfile.ZipFile(io.BytesIO(response.content)) as zf:
         with zf.open(file_name) as f:

@@ -75,7 +75,8 @@ async def prepare_data():
     stopInfos = list(zip(_stop_ids, stop_list_raw))
     for stopId, stopInfo in stopInfos:
         stop_list[stopId] = stopInfo
-        stopInfo["lng"] = stopInfo.pop("long")
+        if stopInfo:
+            stopInfo["lng"] = stopInfo.pop("long")
 
     _routeList: list[ProviderRoute] = []
     for route in route_list:
