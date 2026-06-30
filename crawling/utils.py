@@ -17,7 +17,8 @@ DATA_DIR.mkdir(exist_ok=True)
 def download_igeocom_geojson():
     """Download iGeoCom.geojson if file not found"""
 
-    file_name = "iGeoCom.geojson"
+    # filename in zipfile is iGeoCOM_POI.geojson, but we want to save it as iGeoCom.geojson
+    file_name = "iGeoCOM_POI.geojson"
     file_path = DATA_DIR / "iGeoCom.geojson"
 
     if file_path.exists():
