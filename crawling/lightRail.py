@@ -91,14 +91,21 @@ async def getRouteStop(co="lightRail"):
             eng + " (Circular)" if route in circularRoutes else eng
         )
         if not lightRailObject["stops"] or lightRailObject["stops"][-1] != lightRailId:
-            if route in circularRoutes and seq != "1.00":
+            if route in circularRoutes and seq != "1":
                 # Avoid adding the same stop (orig & dest) twice in circular routes
                 if lightRailId == lightRailObject["stops"][0]:
                     continue
             lightRailObject["stops"].append(lightRailId)
 
         if lightRailId not in stopList:
-            feature = stations[chn]
+
+            station_chn = chn if chn != "海皇路" else "屯門泳池"
+            feature = stations[station_chn]
+
+            if "海皇路" in stations:
+                raise Exception(
+                    "海皇路 is now available in iGeoCom, remove the conversion to 屯門泳池"
+                )
 
             lng, lat = feature["geometry"]["coordinates"]
             stopList[lightRailId] = {
