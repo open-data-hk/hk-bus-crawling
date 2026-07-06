@@ -91,7 +91,7 @@ async def getRouteStop(co="lightRail"):
             eng + " (Circular)" if route in circularRoutes else eng
         )
         if not lightRailObject["stops"] or lightRailObject["stops"][-1] != lightRailId:
-            if route in circularRoutes and seq != "1.00":
+            if route in circularRoutes and seq != "1":
                 # Avoid adding the same stop (orig & dest) twice in circular routes
                 if lightRailId == lightRailObject["stops"][0]:
                     continue
