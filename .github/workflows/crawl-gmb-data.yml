@@ -18,18 +18,14 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v7
 
-      - name: Install poetry
-        run: pipx install poetry
-
-      - name: Setup Python environment
-        uses: actions/setup-python@v7
+      - name: Install uv and set up Python
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: '3.14'
-          architecture: 'x64'
-          cache: 'poetry'
+          enable-cache: true
 
       - name: Install dependencies
-        run: poetry install
+        run: uv sync --locked
 
       - name: Download GMB raw data from S3
         continue-on-error: true
@@ -42,7 +38,7 @@ jobs:
       - name: Crawl GMB raw data
         env:
           REQUEST_LIMIT: "6"
-        run: poetry run python ./crawling/gmb_crawl.py
+        run: uv run python ./crawling/gmb_crawl.py
 
       - name: Upload GMB raw data to S3
         run: |
