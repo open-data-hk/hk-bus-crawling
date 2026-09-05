@@ -63,7 +63,7 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      - name: Download raw data from S3
+      - name: Download raw data from S3 (GMB, CTB, NLB)
         continue-on-error: true
         run: |
           aws s3 cp s3://${{ secrets.AWS_S3_BUCKET }}/transport/gmb/gmb.raw.routeNoList.json data/ &
