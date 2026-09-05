@@ -54,18 +54,14 @@ jobs:
             echo "target-path=/" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Install poetry
-        run: pipx install poetry
-
-      - name: Setup Python environment
-        uses: actions/setup-python@v7
+      - name: Install uv and set up Python
+        uses: astral-sh/setup-uv@v10.0.1
         with:
-            python-version: '3.14'
-            architecture: 'x64'
-            cache: 'poetry'
+          python-version: '3.14'
+          enable-cache: true
 
       - name: Install dependencies
-        run: poetry install
+        run: uv sync --locked
 
       - name: Download GMB raw data from S3
         continue-on-error: true
@@ -96,29 +92,29 @@ jobs:
           REQUEST_LIMIT: "6"
         run: |
           set -o xtrace
-          poetry run python ./crawling/parseJourneyTime.py
-          poetry run python ./crawling/parseGtfs.py
-          poetry run python ./crawling/parseHoliday.py
-          poetry run python ./crawling/ctb_crawl.py
-          poetry run python ./crawling/ctb.py
-          poetry run python ./crawling/kmb_crawl.py
-          poetry run python ./crawling/kmb.py
-          poetry run python ./crawling/nlb_crawl.py
-          poetry run python ./crawling/nlb.py
-          poetry run python ./crawling/lrtfeeder.py
-          poetry run python ./crawling/lightRail.py
-          poetry run python ./crawling/mtr.py
-          poetry run python ./crawling/gmb_crawl.py
-          poetry run python ./crawling/gmb.py
-          poetry run python ./crawling/sunferry.py
-          poetry run python ./crawling/fortuneferry.py
-          poetry run python ./crawling/hkkf.py
-          poetry run python ./crawling/matchGtfs.py
-          poetry run python ./crawling/cleansing.py
-          poetry run python ./crawling/mergeRoutes.py
-          poetry run python ./crawling/mergeStopList.py
-          poetry run python ./crawling/routeCompare.py
-          poetry run python ./crawling/mtrExits.py
+          uv run python ./crawling/parseJourneyTime.py
+          uv run python ./crawling/parseGtfs.py
+          uv run python ./crawling/parseHoliday.py
+          uv run python ./crawling/ctb_crawl.py
+          uv run python ./crawling/ctb.py
+          uv run python ./crawling/kmb_crawl.py
+          uv run python ./crawling/kmb.py
+          uv run python ./crawling/nlb_crawl.py
+          uv run python ./crawling/nlb.py
+          uv run python ./crawling/lrtfeeder.py
+          uv run python ./crawling/lightRail.py
+          uv run python ./crawling/mtr.py
+          uv run python ./crawling/gmb_crawl.py
+          uv run python ./crawling/gmb.py
+          uv run python ./crawling/sunferry.py
+          uv run python ./crawling/fortuneferry.py
+          uv run python ./crawling/hkkf.py
+          uv run python ./crawling/matchGtfs.py
+          uv run python ./crawling/cleansing.py
+          uv run python ./crawling/mergeRoutes.py
+          uv run python ./crawling/mergeStopList.py
+          uv run python ./crawling/routeCompare.py
+          uv run python ./crawling/mtrExits.py
 
       - name: Upload integrated data to S3
         run: |

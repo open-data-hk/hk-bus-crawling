@@ -51,36 +51,36 @@ Daily fetched JSON is in [gh-pages](https://github.com/open-data-hk/hk-bus-crawl
 
 ### Installation
 
-Use `poetry` to install the dependencies to your environment:
+Use `uv` to install the dependencies to your environment:
 
 ```
-poetry install --no-root
+uv sync
 ```
 
 ### Data Fetching
 
 To fetch data, run the followings,
 ```
-poetry run python ./crawling/parseJourneyTime.py
-poetry run python ./crawling/parseGtfs.py
-poetry run python ./crawling/parseHoliday.py
-poetry run python ./crawling/ctb_crawl.py
-poetry run python ./crawling/ctb.py
-poetry run python ./crawling/kmb_crawl.py
-poetry run python ./crawling/kmb.py
-poetry run python ./crawling/nlb_crawl.py
-poetry run python ./crawling/nlb.py
-poetry run python ./crawling/lrtfeeder.py
-poetry run python ./crawling/lightRail.py
-poetry run python ./crawling/mtr.py
-poetry run python ./crawling/sunferry.py
-poetry run python ./crawling/fortuneferry.py
-poetry run python ./crawling/hkkf.py
-poetry run python ./crawling/gmb_crawl.py
-poetry run python ./crawling/gmb.py
-poetry run python ./crawling/matchGtfs.py
-poetry run python ./crawling/cleansing.py
-poetry run python ./crawling/mergeRoutes.py
+uv run python ./crawling/parseJourneyTime.py
+uv run python ./crawling/parseGtfs.py
+uv run python ./crawling/parseHoliday.py
+uv run python ./crawling/ctb_crawl.py
+uv run python ./crawling/ctb.py
+uv run python ./crawling/kmb_crawl.py
+uv run python ./crawling/kmb.py
+uv run python ./crawling/nlb_crawl.py
+uv run python ./crawling/nlb.py
+uv run python ./crawling/lrtfeeder.py
+uv run python ./crawling/lightRail.py
+uv run python ./crawling/mtr.py
+uv run python ./crawling/sunferry.py
+uv run python ./crawling/fortuneferry.py
+uv run python ./crawling/hkkf.py
+uv run python ./crawling/gmb_crawl.py
+uv run python ./crawling/gmb.py
+uv run python ./crawling/matchGtfs.py
+uv run python ./crawling/cleansing.py
+uv run python ./crawling/mergeRoutes.py
 ```
 
 ## Citing 

@@ -18,23 +18,19 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v7
 
-      - name: Install poetry
-        run: pipx install poetry
-
-      - name: Setup Python environment
-        uses: actions/setup-python@v7
+      - name: Install uv and set up Python
+        uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: '3.14'
-          architecture: 'x64'
-          cache: 'poetry'
+          enable-cache: true
 
       - name: Install dependencies
-        run: poetry install
+        run: uv sync --locked
 
       - name: Crawl NLB raw data
         env:
           REQUEST_LIMIT: "6"
-        run: poetry run python ./crawling/nlb_crawl.py --force
+        run: uv run python ./crawling/nlb_crawl.py --force
 
       - name: Upload NLB raw data to S3
         run: |
