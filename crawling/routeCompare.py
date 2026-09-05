@@ -89,7 +89,10 @@ async def routeCompare():
     os.makedirs(DATA_DIR / "route-ts", exist_ok=True)
 
     def isRouteEqual(a, b):
-        return xxhash.xxh3_64(str(a)).hexdigest() == xxhash.xxh3_64(str(b)).hexdigest()
+        return (
+            xxhash.xxh3_64(str(a).encode("utf-8")).hexdigest()
+            == xxhash.xxh3_64(str(b).encode("utf-8")).hexdigest()
+        )
 
     for newStop in newDb["stopList"]:
         if newStop not in oldDb["stopList"] or not isRouteEqual(
