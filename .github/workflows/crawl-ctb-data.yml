@@ -38,9 +38,11 @@ jobs:
 
       - name: Upload CTB raw data to S3
         run: |
-          aws s3 cp data/ctb.raw.routeList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.routeList.json
-          aws s3 cp data/ctb.raw.routeStopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.routeStopList.json
-          aws s3 cp data/ctb.raw.stopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.stopList.json
+          pids=()
+          aws s3 cp data/ctb.raw.routeList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.routeList.json & pids+=($!)
+          aws s3 cp data/ctb.raw.routeStopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.routeStopList.json & pids+=($!)
+          aws s3 cp data/ctb.raw.stopList.json s3://${{ secrets.AWS_S3_BUCKET }}/transport/ctb/ctb.raw.stopList.json & pids+=($!)
+          for pid in "${pids[@]}"; do wait "$pid"; done
 
       - name: Archive CTB raw data
         uses: actions/upload-artifact@v7
