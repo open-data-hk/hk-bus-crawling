@@ -1,7 +1,7 @@
 name: Crawl KMB Data
 on:
   schedule:
-    - cron: "30 20 * * *" # 04:30 (HKT) daily
+    - cron: "5 21 * * *"
   workflow_dispatch:
 
 jobs:
