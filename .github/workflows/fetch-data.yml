@@ -63,7 +63,7 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      - name: Download raw data from GitHub Releases (GMB, CTB, NLB)
+      - name: Download raw data from GitHub Releases (GMB, CTB, NLB, KMB)
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
@@ -72,6 +72,7 @@ jobs:
           gh release download latest-gmb --repo ${{ github.repository }} --dir data --clobber &
           gh release download latest-ctb --repo ${{ github.repository }} --dir data --clobber &
           gh release download latest-nlb --repo ${{ github.repository }} --dir data --clobber &
+          gh release download latest-kmb --repo ${{ github.repository }} --dir data --clobber &
           wait
 
       - name: Crawling resources
