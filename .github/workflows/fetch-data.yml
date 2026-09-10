@@ -64,16 +64,16 @@ jobs:
         run: uv sync --locked
 
       - name: Download raw data from GitHub Releases (GMB, CTB, NLB, KMB)
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p data
-          gh release download latest-gmb --repo ${{ github.repository }} --dir data --clobber &
-          gh release download latest-ctb --repo ${{ github.repository }} --dir data --clobber &
-          gh release download latest-nlb --repo ${{ github.repository }} --dir data --clobber &
-          gh release download latest-kmb --repo ${{ github.repository }} --dir data --clobber &
-          wait
+          pids=()
+          gh release download latest-gmb --repo ${{ github.repository }} --dir data --clobber & pids+=($!)
+          gh release download latest-ctb --repo ${{ github.repository }} --dir data --clobber & pids+=($!)
+          gh release download latest-nlb --repo ${{ github.repository }} --dir data --clobber & pids+=($!)
+          gh release download latest-kmb --repo ${{ github.repository }} --dir data --clobber & pids+=($!)
+          for pid in "${pids[@]}"; do wait "$pid" || exit 1; done
 
       - name: Crawling resources
         timeout-minutes: 5
@@ -98,16 +98,13 @@ jobs:
           timed ./crawling/parseJourneyTime.py
           timed ./crawling/parseGtfs.py
           timed ./crawling/parseHoliday.py
-          timed ./crawling/ctb_crawl.py
+          # skip all crawling scripts as the raw data is already downloaded from GitHub Releases
           timed ./crawling/ctb.py
-          timed ./crawling/kmb_crawl.py
           timed ./crawling/kmb.py
-          timed ./crawling/nlb_crawl.py
           timed ./crawling/nlb.py
           timed ./crawling/lrtfeeder.py
           timed ./crawling/lightRail.py
           timed ./crawling/mtr.py
-          timed ./crawling/gmb_crawl.py
           timed ./crawling/gmb.py
           timed ./crawling/sunferry.py
           timed ./crawling/fortuneferry.py
