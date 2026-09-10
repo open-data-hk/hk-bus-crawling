@@ -87,10 +87,11 @@ jobs:
 
           timed() {
             local script="$1"
-            local start=$SECONDS
+            local start
+            start=$(date +%s%3N)
             uv run python "$script"
-            local elapsed=$((SECONDS - start))
-            echo "| $script | ${elapsed}s |" >> "$GITHUB_STEP_SUMMARY"
+            local elapsed=$(( $(date +%s%3N) - start ))
+            echo "| $script | ${elapsed}ms |" >> "$GITHUB_STEP_SUMMARY"
           }
 
           timed ./crawling/parseJourneyTime.py
