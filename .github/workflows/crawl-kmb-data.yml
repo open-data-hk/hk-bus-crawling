@@ -30,7 +30,7 @@ jobs:
         run: uv run python ./crawling/kmb_crawl.py --force
 
       - name: Publish KMB raw data to "latest-kmb" release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: latest-kmb
           name: Latest KMB raw data

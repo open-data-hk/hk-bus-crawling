@@ -44,7 +44,7 @@ jobs:
         run: uv run python ./crawling/gmb_crawl.py
 
       - name: Publish GMB raw data to "latest-gmb" release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: latest-gmb
           name: Latest GMB raw data

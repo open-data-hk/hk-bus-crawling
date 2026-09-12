@@ -32,7 +32,7 @@ jobs:
         run: uv run python ./crawling/ctb_crawl.py --force
 
       - name: Publish CTB raw data to "latest-ctb" release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: latest-ctb
           name: Latest CTB raw data
