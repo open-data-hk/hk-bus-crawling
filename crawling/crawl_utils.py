@@ -15,30 +15,49 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-async def emitRequest(url: str, client: httpx.AsyncClient, headers={}):
+class RetriesExhaustedError(Exception):
+    """Raised by emitRequest when max_retries is set and every attempt failed."""
+
+
+async def emitRequest(
+    url: str,
+    client: httpx.AsyncClient,
+    headers={},
+    max_retries: int | None = None,
+):
+    """GET url, retrying transient failures with exponential backoff.
+
+    By default retries forever. With max_retries set, 5xx responses are also
+    retried, and RetriesExhaustedError is raised after max_retries retries.
+    """
     RETRY_TIMEOUT_MAX = 300
     retry_timeout = 1
+    retries = 0
+
+    async def backoff(reason: str):
+        nonlocal retry_timeout, retries
+        if max_retries is not None and retries >= max_retries:
+            raise RetriesExhaustedError(f"{reason} after {retries} retries. URL={url}")
+        retries += 1
+        logger.warning(f"{reason}, wait {retry_timeout} and retry. URL={url}")
+        await asyncio.sleep(retry_timeout)
+        retry_timeout = min(retry_timeout * 2, RETRY_TIMEOUT_MAX)
+
     # retry if "Too many request (429)"
     while True:
         try:
             r = await client.get(url, headers=headers)
             if r.status_code == 200:
                 return r
-            elif r.status_code in (429, 502, 504, 403):
-                logger.warning(
-                    f"status_code={r.status_code}, wait {retry_timeout} and retry. URL={url}"
-                )
-                await asyncio.sleep(retry_timeout)
-                retry_timeout = min(retry_timeout * 2, RETRY_TIMEOUT_MAX)
+            elif r.status_code in (429, 502, 504, 403) or (
+                max_retries is not None and r.status_code >= 500
+            ):
+                await backoff(f"status_code={r.status_code}")
             else:
                 r.raise_for_status()
                 raise Exception(r.status_code, url)
         except (httpx.PoolTimeout, httpx.ReadTimeout, httpx.ReadError) as e:
-            logger.warning(
-                f"Exception {repr(e)} occurred, wait {retry_timeout} and retry. URL={url}"
-            )
-            await asyncio.sleep(retry_timeout)
-            retry_timeout = min(retry_timeout * 2, RETRY_TIMEOUT_MAX)
+            await backoff(f"Exception {repr(e)} occurred")
 
 
 def get_request_limit():
