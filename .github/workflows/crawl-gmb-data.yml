@@ -7,6 +7,7 @@ on:
 jobs:
   Crawl-GMB-Data:
     runs-on: ubuntu-latest
+    timeout-minutes: 3 # usually finishes within 1 minute
 
     permissions:
       issues: write
