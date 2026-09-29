@@ -30,7 +30,7 @@ jobs:
         run: uv run python ./crawling/nlb_crawl.py --force
 
       - name: Publish NLB raw data to "latest-nlb" release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: latest-nlb
           name: Latest NLB raw data
