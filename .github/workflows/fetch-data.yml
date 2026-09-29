@@ -77,7 +77,6 @@ jobs:
           for pid in "${pids[@]}"; do wait "$pid" || exit 1; done
 
       - name: Crawling resources
-        timeout-minutes: 5
         shell: bash
         env:
           REQUEST_LIMIT: "6"
