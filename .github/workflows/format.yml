@@ -5,6 +5,7 @@ on: [push]
 jobs:
   format:
     runs-on: ubuntu-latest
+    timeout-minutes: 1
     steps:
       - uses: actions/checkout@v7
       - uses: psf/black@stable
