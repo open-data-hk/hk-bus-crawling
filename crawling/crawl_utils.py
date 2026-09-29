@@ -60,6 +60,64 @@ async def emitRequest(
             await backoff(f"Exception {repr(e)} occurred")
 
 
+GITHUB_API_URL = "https://api.github.com"
+
+
+async def notify_github_issue(
+    title: str, label: str, body: str, client: httpx.AsyncClient
+) -> None:
+    """Best-effort: file (or comment on the open) GitHub issue with this title.
+
+    Never raises, so a notification failure cannot mask the original error.
+    """
+    token = os.environ.get("GITHUB_TOKEN")
+    repo = os.environ.get("GITHUB_REPOSITORY")
+    if not token or not repo:
+        logger.error(
+            "GITHUB_TOKEN/GITHUB_REPOSITORY not set, skipping GitHub issue "
+            "notification %r:\n%s",
+            title,
+            body,
+        )
+        return
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+    }
+    try:
+        r = await client.get(
+            f"{GITHUB_API_URL}/search/issues",
+            headers=headers,
+            params={
+                "q": f'repo:{repo} type:issue state:open label:"{label}" '
+                f'in:title "{title}"'
+            },
+        )
+        r.raise_for_status()
+        existing_issues = r.json().get("items", [])
+
+        if existing_issues:
+            issue_number = existing_issues[0]["number"]
+            r = await client.post(
+                f"{GITHUB_API_URL}/repos/{repo}/issues/{issue_number}/comments",
+                headers=headers,
+                json={"body": body},
+            )
+            r.raise_for_status()
+            logger.warning("Added comment to existing issue #%s", issue_number)
+        else:
+            r = await client.post(
+                f"{GITHUB_API_URL}/repos/{repo}/issues",
+                headers=headers,
+                json={"title": title, "body": body, "labels": [label]},
+            )
+            r.raise_for_status()
+            logger.warning("Filed issue %s", r.json().get("html_url"))
+    except Exception:
+        logger.exception("Failed to file GitHub issue %r:\n%s", title, body)
+
+
 def get_request_limit():
     default_limit = "10"
     return int(os.environ.get("REQUEST_LIMIT", default_limit))
