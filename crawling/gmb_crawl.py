@@ -10,10 +10,20 @@ from zoneinfo import ZoneInfo
 import httpx
 
 try:
-    from .crawl_utils import emitRequest, get_request_limit
+    from .crawl_utils import (
+        RetriesExhaustedError,
+        emitRequest,
+        get_request_limit,
+        notify_github_issue,
+    )
     from .utils import DATA_DIR
 except ImportError:
-    from crawl_utils import emitRequest, get_request_limit
+    from crawl_utils import (
+        RetriesExhaustedError,
+        emitRequest,
+        get_request_limit,
+        notify_github_issue,
+    )
     from utils import DATA_DIR
 
 logger = logging.getLogger(__name__)
@@ -26,6 +36,9 @@ RAW_STOP_LIST = DATA_DIR / ("gmb.raw.stopList.json")
 
 BASE_URL = "https://data.etagmb.gov.hk"
 REGIONS = ["HKI", "KLN", "NT"]
+
+LAST_UPDATE_MAX_RETRIES = 3
+API_ISSUE_LABEL = "gmb-api-error"
 
 
 def route_stop_url(route_id, route_seq):
@@ -104,8 +117,22 @@ async def get_stop(stop_id: int, stops_fetch: dict, a_client) -> None:
 async def get_last_update(
     data_type: Literal["route", "stop", "route-stop"], a_client
 ) -> None:
+    url = last_update_url(data_type)
     async with req_stops_limit:
-        r = await emitRequest(last_update_url(data_type), a_client)
+        try:
+            r = await emitRequest(url, a_client, max_retries=LAST_UPDATE_MAX_RETRIES)
+        except RetriesExhaustedError as e:
+            await notify_github_issue(
+                title=f"[gmb_crawl] {url} keeps failing",
+                label=API_ISSUE_LABEL,
+                body=(
+                    f"`crawling/gmb_crawl.py` gave up on `{url}` after "
+                    f"{LAST_UPDATE_MAX_RETRIES} retries (5xx / timeout):\n\n"
+                    f"```\n{e}\n```"
+                ),
+                client=a_client,
+            )
+            raise
         return r.json()["data"]
 
 

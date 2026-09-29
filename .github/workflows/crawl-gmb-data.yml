@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
+      issues: write
       contents: write
 
     steps:
@@ -41,6 +42,7 @@ jobs:
       - name: Crawl GMB raw data
         env:
           REQUEST_LIMIT: "6"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run python ./crawling/gmb_crawl.py
 
       - name: Publish GMB raw data to "latest-gmb" release
