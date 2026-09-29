@@ -14,6 +14,7 @@ jobs:
   Fetch-Route-Data:
     if: ${{ github.event_name != 'pull_request' || github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 3
     permissions:
       actions: write
       contents: write
