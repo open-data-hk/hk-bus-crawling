@@ -48,7 +48,7 @@ def ensure_raw_files_exist():
 
 
 def get_route_obj(co: str, route: dict, route_stops: list[dict]) -> ProviderRoute:
-    stop_ids = [stop["stopId"] for stop in route_stops]
+    stop_ids = [str(stop["stopId"]) for stop in route_stops]
     fares = [stop["fare"] for stop in route_stops]
     fares_holiday = [stop["fareHoliday"] for stop in route_stops]
     some_departure_observe_only = [
@@ -78,7 +78,7 @@ def get_route_obj(co: str, route: dict, route_stops: list[dict]) -> ProviderRout
 
 def get_stop_obj(stop: dict) -> ProviderStop:
     return {
-        "stop": stop["stopId"],
+        "stop": str(stop["stopId"]),
         "name_en": stop["stopName_e"],
         "name_tc": stop["stopName_c"],
         "name_sc": stop["stopName_s"],
